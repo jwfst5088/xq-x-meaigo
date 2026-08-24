@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cf-chess",
+  "main": "index.js",
+  "compatibility_date": "2024-01-01",
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHESS_ROOM",
+        "class_name": "ChessRoom"
+      }
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "CHESS_DB",
+      "database_name": "cf-chess-db",
+      "database_id": "ecc99edf-7373-4565-a750-cbe71ff97b6b"
+    }
+  ],
+  "vars": {
+    "AI_SERVER_URL": "https://xq.xqz.kdns.fr"
+  }
+}
