@@ -61,6 +61,7 @@ var ChessRoom = class {
         capturedRed: [],
         capturedBlack: [],
         playerTokens: null,
+        gameStarted: false,
         createdAt: Date.now()
       };
       try {
@@ -81,6 +82,7 @@ var ChessRoom = class {
               this.room.capturedBlack = s.capturedBlack || [];
               this.room.createdAt = s.createdAt;
               this.room.playerTokens = s.playerTokens || null;
+              this.room.gameStarted = !!s.gameStarted;
               this.room._restoredFromDb = true;
             }
           }
@@ -105,6 +107,7 @@ var ChessRoom = class {
         capturedRed: this.room.capturedRed || [],
         capturedBlack: this.room.capturedBlack || [],
         playerTokens: this.room.playerTokens || null,
+        gameStarted: !!this.room.gameStarted,
         createdAt: this.room.createdAt
       });
       await this.env.CHESS_DB.prepare(
@@ -147,6 +150,7 @@ var ChessRoom = class {
   handleRoomWebSocket(ws) {
     const socketData = { color: null, spectator: false, replaced: false };
     ws._socketData = socketData;
+    ws._lastSeen = Date.now();
     let heartbeatTimer = null;
     let heartbeatTimeout = null;
     const startHeartbeat = /* @__PURE__ */ __name(() => {
@@ -181,6 +185,7 @@ var ChessRoom = class {
     startHeartbeat();
     ws.onmessage = async (event) => {
       try {
+        ws._lastSeen = Date.now();
         const data = JSON.parse(event.data);
         const eventName = data.event || data[0];
         const payload = data.payload || data[1];
@@ -199,17 +204,32 @@ var ChessRoom = class {
             clearTimeout(this._cleanupTimer);
             this._cleanupTimer = null;
           }
+          // 清扫僵尸座位：已关闭/半关闭/已被替换的旧连接不再占用颜色，
+          // 防止"离开后同房间号重进"产生同色双座位（卡死根源）
+          for (const [pws, p] of [...this.room.players]) {
+            const st = pws.readyState;
+            const rep = pws._socketData && pws._socketData.replaced;
+            if (st === 2 || st === 3 || rep) this.room.players.delete(pws);
+          }
           let lastColor = null;
           if (payload && typeof payload === "object" && payload.lastColor) {
             lastColor = payload.lastColor;
           }
           if (this.room.players.size > 0) {
-            const existingColor = [...this.room.players.values()][0].color;
-            const myColor = existingColor === "red" ? "black" : "red";
+            let existingColor = [...this.room.players.values()][0].color;
+            let myColor = existingColor === "red" ? "black" : "red";
+            // 最终保险：若目标颜色仍被其他存活连接占用（半开僵尸未被清扫），则取反色；双方都被占则拒绝
+            const takenByLive = [...this.room.players.entries()].some(([pws2, p2]) => p2.color === myColor && pws2 !== ws && !(pws2._socketData && pws2._socketData.replaced));
+            if (takenByLive) myColor = myColor === "red" ? "black" : "red";
+            const stillTaken = [...this.room.players.values()].some((p2) => p2.color === myColor);
+            if (stillTaken) {
+              ws.send(JSON.stringify({ event: "error", data: "\u623F\u95F4\u5DF2\u6EE1" }));
+              return;
+            }
             const myPid = Math.random().toString(36).slice(2) + Date.now().toString(36);
             if (!this.room.playerTokens) this.room.playerTokens = {};
             this.room.playerTokens[myColor] = myPid;
-            this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor });
+            this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
           } else {
@@ -224,7 +244,7 @@ var ChessRoom = class {
             const myPid = Math.random().toString(36).slice(2) + Date.now().toString(36);
             if (!this.room.playerTokens) this.room.playerTokens = {};
             this.room.playerTokens[myColor] = myPid;
-            this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor });
+            this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
           }
@@ -232,6 +252,12 @@ var ChessRoom = class {
           if (this._cleanupTimer) {
             clearTimeout(this._cleanupTimer);
             this._cleanupTimer = null;
+          }
+          // 同上：先清扫僵尸座位再判断房间是否满员
+          for (const [pws, p] of [...this.room.players]) {
+            const st = pws.readyState;
+            const rep = pws._socketData && pws._socketData.replaced;
+            if (st === 2 || st === 3 || rep) this.room.players.delete(pws);
           }
           if (this.room.players.size === 0) {
             ws.send(JSON.stringify({ event: "error", data: "\u623F\u95F4\u4E0D\u5B58\u5728" }));
@@ -247,8 +273,9 @@ var ChessRoom = class {
           const joinPid = Math.random().toString(36).slice(2) + Date.now().toString(36);
           if (!this.room.playerTokens) this.room.playerTokens = {};
           this.room.playerTokens[color] = joinPid;
-          this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color });
+          this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
+          if (this.room.players.size >= 2) this.room.gameStarted = true;
           ws.send(JSON.stringify({ event: "room_joined", data: { roomId: this.room.id, color, pid: joinPid } }));
           this.broadcastRoomState();
           this.broadcastToPlayers(JSON.stringify({ event: "game_start", data: { currentTurn: this.room.currentTurn } }));
@@ -258,7 +285,7 @@ var ChessRoom = class {
             ws.send(JSON.stringify({ event: "move_rejected", data: { reason: "invalid_state" } }));
             return;
           }
-          if (this.room.players.size < 2 && this.room.moveHistory.length === 0) {
+          if (this.room.players.size < 2 && this.room.moveHistory.length === 0 && !this.room.gameStarted) {
             ws.send(JSON.stringify({ event: "move_rejected", data: { reason: "invalid_state" } }));
             return;
           }
@@ -406,6 +433,11 @@ var ChessRoom = class {
           if (!this.room) return;
           this.broadcastToOpponent(ws, JSON.stringify({ event: "undo_rejected", data: {} }));
         } else if (eventName === "reconnect_room") {
+          // 自愈：房间对象已被销毁（如对手离开重建）时，从D1或全新状态恢复，避免静默失败
+          if (!this.room) {
+            try { await this.initRoom(this.room.id); } catch (e2) {}
+          }
+          if (!this.room) return;
           const otherEntries = [...this.room.players.entries()].filter(([pws]) => pws !== ws);
           const isReplaceable = /* @__PURE__ */ __name((c) => otherEntries.some(([pws, p]) => p.color === c && (pws.readyState === WebSocket.CLOSED || pws.readyState === WebSocket.CLOSING || pws.readyState === WebSocket.CONNECTING || this.disconnected && this.disconnected[c])), "isReplaceable");
           const isFree = /* @__PURE__ */ __name((c) => !otherEntries.some(([, p]) => p.color === c), "isFree");
@@ -421,6 +453,24 @@ var ChessRoom = class {
             } else {
               const sameColorEntry = otherEntries.find(([, p]) => p.color === color);
               if (sameColorEntry) {
+                // 同色座位占用裁决：
+                //  允许接管 = pid匹配(本人) | 持有者已死/被替换 | 持有者闲置>25s(僵尸) | 座位早于该色离开标记(旧主人回归)
+                //  其余（离开重建后新客人合法占座）→ 不抢，改反色或拒绝
+                const [hws, seat] = sameColorEntry;
+                const pidMatches = !!(payload.pid && this.room.playerTokens && this.room.playerTokens[color] === payload.pid);
+                const holderDead = hws.readyState !== 1 || (hws._socketData && hws._socketData.replaced);
+                const holderIdle = !hws._lastSeen || Date.now() - hws._lastSeen > 25e3;
+                const preDiscSeat = !!(this.disconnected && this.disconnected[color] && seat.assignedAt && this.disconnected[color] > seat.assignedAt);
+                if (!pidMatches && !holderDead && !holderIdle && !preDiscSeat) {
+                  const alt2 = color === "red" ? "black" : "red";
+                  if (isFree(alt2) || isReplaceable(alt2)) {
+                    color = alt2;
+                  } else {
+                    ws.send(JSON.stringify({ event: "error", data: "\u623F\u95F4\u5DF2\u6EE1\uFF0C\u65E0\u6CD5\u91CD\u8FDE" }));
+                    try { ws.close(); } catch (e2) {}
+                    return;
+                  }
+                }
               } else {
                 const alt = color === "red" ? "black" : "red";
                 if (isFree(alt) || isReplaceable(alt)) {
@@ -452,6 +502,15 @@ var ChessRoom = class {
             clearTimeout(this.room._disconnectTimer);
             this.room._disconnectTimer = null;
           }
+          // 身份自愈：若来者 pid 与该座位令牌不符（换先后本地过期），接管座位时轮换令牌，
+          // 并在 room_state 中下发新 pid（附加字段，旧前端忽略，无兼容性影响）
+          let rotatedPid = null;
+          const pidMatches = !!(payload.pid && this.room.playerTokens && this.room.playerTokens[color] === payload.pid);
+          if (!pidMatches) {
+            rotatedPid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+            if (!this.room.playerTokens) this.room.playerTokens = {};
+            this.room.playerTokens[color] = rotatedPid;
+          }
           for (const [pws, player] of this.room.players) {
             if (player.color === color && pws !== ws) {
               if (pws._socketData) pws._socketData.replaced = true;
@@ -459,8 +518,9 @@ var ChessRoom = class {
               break;
             }
           }
-          this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color });
+          this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
+          if (this.room.players.size >= 2) this.room.gameStarted = true;
           const gameInProgress = !this.room.gameOver && this.room.moveHistory.length > 0;
           try {
             ws.send(JSON.stringify({ event: "room_state", data: {
@@ -474,7 +534,8 @@ var ChessRoom = class {
               blkTime: this.room.blkTime,
               capturedRed: this.room.capturedRed,
               capturedBlack: this.room.capturedBlack,
-              gameStarted: true
+              gameStarted: true,
+              pid: rotatedPid || payload.pid || undefined
             } }));
           } catch (e) {
           }
