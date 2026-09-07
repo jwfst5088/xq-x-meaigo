@@ -343,7 +343,7 @@ var ChessRoom = class {
           this.broadcastToOpponent(ws, JSON.stringify({ event: "opponent_move", data: opponentMove }));
           this.broadcastRoomStateToOpponent(ws);
           this.broadcastToSpectators(JSON.stringify({ event: "opponent_move", data: opponentMove }));
-          await this._saveRoomState();
+          this.ctx.waitUntil(this._saveRoomState());
         } else if (eventName === "resign") {
           if (!this.room) return;
           this.room.gameOver = true;
@@ -734,6 +734,8 @@ var ChessRoom = class {
         this.room._timer = null;
         return;
       }
+      // 每秒推送极小的 time_update：持续冲刷边缘TCP发送缓冲，走子消息不再等客户端ping才送达（前端安全忽略未知事件）
+      this.broadcastToRoom(JSON.stringify({ event: "time_update", data: { redTime: this.room.redTime, blkTime: this.room.blkTime, currentTurn: this.room.currentTurn } }));
       const now = Date.now();
       const elapsed = Math.max(1, Math.round((now - this.room._timerLastTick) / 1e3));
       this.room._timerLastTick = now;
