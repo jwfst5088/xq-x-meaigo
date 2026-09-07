@@ -1,8 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cf-chess",
+  "name": "cf-chess2",
   "main": "index.js",
   "compatibility_date": "2024-01-01",
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ChessRoom"]
+    }
+  ],
   "assets": {
     "directory": "dist",
     "binding": "ASSETS"
@@ -18,8 +24,8 @@
   "d1_databases": [
     {
       "binding": "CHESS_DB",
-      "database_name": "cf-chess-db",
-      "database_id": "ecc99edf-7373-4565-a750-cbe71ff97b6b"
+      "database_name": "cf-chess2-db",
+      "database_id": "f392b3d4-3786-4c90-a9ea-a22d985002d6"
     }
   ],
   "vars": {
