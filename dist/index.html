@@ -1506,12 +1506,12 @@ socket.on('connect',function(){sockOk=true;D('lobbyStatus').textContent='● 服
 hideReconnecting();
 var isPageReload=!!window._pendingReconnect;
 if(window._pendingRoomAction&&socket.roomId){var pa=window._pendingRoomAction;window._pendingRoomAction=null;
- if(pa.action==='reconnect'){socket.emit('reconnect_room',{roomId:pa.roomId,color:pa.color});}
+ if(pa.action==='reconnect'){socket.emit('reconnect_room',Object.assign({roomId:pa.roomId,color:pa.color},window._xqIdentityFields?window._xqIdentityFields():{}));}
  else if(pa.action==='create'){socket.emit('create_room',{roomId:pa.roomId,lastColor:pa.lastColor||null});}
  else{socket.emit(pa.action+'_room',Object.assign({roomId:pa.roomId},window._xqIdentityFields?window._xqIdentityFields():{}));}
 }
 else if(window._pendingReconnect){var pr=window._pendingReconnect;if(pr.redLeft!==undefined){redLeft=pr.redLeft;blkLeft=pr.blkLeft;}window._pendingReconnect=null;socket.emit('reconnect_room',Object.assign({roomId:pr.myRm,color:pr.myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
-else if(gm==='online'&&myRm){socket.emit('reconnect_room',{roomId:myRm,color:myCl});}
+else if(gm==='online'&&myRm){socket.emit('reconnect_room',Object.assign({roomId:myRm,color:myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
 window._isPageReload=isPageReload;
 });
 socket.on('disconnect',function(){sockOk=false;disconnectTime=Date.now();if(gm==='online'&&myRm){showReconnecting();}});
@@ -1776,7 +1776,7 @@ setTimeout(function(){forceExitGame();},5000);
 return;
 }
 if(sockOk&&gm==='online'&&myRm){
-socket.emit('reconnect_room',{roomId:myRm,color:myCl});
+socket.emit('reconnect_room',Object.assign({roomId:myRm,color:myCl},window._xqIdentityFields?window._xqIdentityFields():{}));
 }
 },500);
 }
@@ -6341,7 +6341,16 @@ var nm=function(d){applySeatNames(d&&d.seatInfo,(typeof myCl!=='undefined')?myCl
 socket.on('room_created',nm);
 socket.on('room_joined',nm);
 socket.on('game_start',nm);
-socket.on('room_state',nm);
+socket.on('room_state',function(d){
+nm(d);
+try{
+// 换边再战后服务端座位颜色可能变化：以room_state的color为准同步棋盘翻转
+if(d&&d.color&&(typeof gm!=='undefined')&&gm==='online'&&typeof D==='function'&&D('game')&&D('game').classList.contains('show')&&typeof boardFlip!=='undefined'){
+var nf=(d.color==='black');
+if(boardFlip!==nf){boardFlip=nf;drawBoardBg();render();}
+}
+}catch(e){}
+});
 }catch(e){}
 }
 }

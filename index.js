@@ -431,7 +431,8 @@ var ChessRoom = class {
           if (move.gameOver) {
             this.room.gameOver = true;
             this.room._gameEndedAt = Date.now();
-            this.room.winner = move.winner;
+            // 胜者以服务端验证过的走子方座位为准，不信任客户端上报的winner（防止换边后客户端颜色状态错乱导致归属反转）
+            this.room.winner = socketData.color;
             if (this.room._timer) {
               clearInterval(this.room._timer);
               this.room._timer = null;
@@ -557,6 +558,13 @@ var ChessRoom = class {
             const tokColor = this.room.playerTokens.red === payload.pid ? "red" : this.room.playerTokens.black === payload.pid ? "black" : null;
             if (tokColor) {
               payload.color = tokColor;
+            }
+          } else if (payload && payload.deviceId && this.room.seatIdentity) {
+            // 无pid时按设备钉座位：换边/重开后客户端可能报旧颜色，设备永远对应自己的座位
+            const dv = String(payload.deviceId);
+            const devColor = this.room.seatIdentity.red && this.room.seatIdentity.red.dev === dv ? "red" : this.room.seatIdentity.black && this.room.seatIdentity.black.dev === dv ? "black" : null;
+            if (devColor) {
+              payload.color = devColor;
             }
           }
           let color = payload.color;
