@@ -6297,7 +6297,7 @@ function getDev(){var d=null;try{d=localStorage.getItem(DEV_KEY);}catch(e){}
 if(!d||d.length<3){d='D'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem(DEV_KEY,d);}catch(e){}}
 return d;}
 function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return null;}}
-window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||null,elo:(p&&p.elo)?p.elo:-160};};
+window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||(p&&p.name)||null,elo:(p&&p.elo)?p.elo:-160};};
 function renderProfile(p){
 var box=$id('profileBox');if(!box||!p)return;
 var nm=p.name||('棋手'+p.deviceId.slice(-4));

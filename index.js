@@ -361,7 +361,7 @@ var ChessRoom = class {
             this.room.playerTokens[myColor] = myPid;
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
-            this._setSeatIdentity(myColor, payload);
+            await this._setSeatIdentity(myColor, payload);
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid, seatInfo: this.getRoomState().seatInfo } }));
           } else {
             let myColor;
@@ -377,7 +377,7 @@ var ChessRoom = class {
             this.room.playerTokens[myColor] = myPid;
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
-            this._setSeatIdentity(myColor, payload);
+            await this._setSeatIdentity(myColor, payload);
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid, seatInfo: this.getRoomState().seatInfo } }));
           }
         } else if (eventName === "join_room") {
@@ -399,7 +399,7 @@ var ChessRoom = class {
             this.room.playerTokens[firstColor] = firstPid;
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: firstColor, assignedAt: Date.now() });
             socketData.color = firstColor;
-            this._setSeatIdentity(firstColor, payload);
+            await this._setSeatIdentity(firstColor, payload);
             try {
               ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: firstColor, pid: firstPid, seatInfo: this.getRoomState().seatInfo } }));
             } catch (e) {
@@ -419,7 +419,7 @@ var ChessRoom = class {
           this.room.playerTokens[color] = joinPid;
           this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
-          this._setSeatIdentity(color, payload);
+          await this._setSeatIdentity(color, payload);
           if (this.room.players.size >= 2) this.room.gameStarted = true;
           ws.send(JSON.stringify({ event: "room_joined", data: { roomId: this.room.id, color, pid: joinPid, seatInfo: this.getRoomState().seatInfo } }));
           this.broadcastRoomState();
@@ -682,7 +682,7 @@ var ChessRoom = class {
           }
           this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
-          this._setSeatIdentity(color, payload);
+          await this._setSeatIdentity(color, payload);
           if (this.room.players.size >= 2) this.room.gameStarted = true;
           const gameInProgress = !this.room.gameOver && this.room.moveHistory.length > 0;
           try {
@@ -892,13 +892,23 @@ var ChessRoom = class {
       }
     };
   }
-  _setSeatIdentity(color, payload) {
+  async _setSeatIdentity(color, payload) {
     if (!color || !payload || typeof payload !== "object") return;
     if (!this.room.seatIdentity) this.room.seatIdentity = {};
     const prev = this.room.seatIdentity[color] || {};
+    const dev = payload.deviceId ? String(payload.deviceId).slice(0, 64) : prev.dev || null;
+    let name = payload.playerName ? String(payload.playerName).slice(0, 24) : prev.name || null;
+    // 昵称为空时回查D1玩家表的真实昵称（该设备/账号历史注册名），避免显示设备尾号
+    if (!name && dev && this.env && this.env.CHESS_DB) {
+      try {
+        const row = await this.env.CHESS_DB.prepare("SELECT name FROM players WHERE device_id = ?").bind(dev).first();
+        if (row && row.name) name = String(row.name).slice(0, 24);
+      } catch (e) {
+      }
+    }
     this.room.seatIdentity[color] = {
-      dev: payload.deviceId ? String(payload.deviceId).slice(0, 64) : prev.dev || null,
-      name: payload.playerName ? String(payload.playerName).slice(0, 24) : prev.name || null,
+      dev: dev,
+      name: name || null,
       elo: Number.isFinite(payload.elo) ? Math.round(payload.elo) : prev.elo || null
     };
   }
