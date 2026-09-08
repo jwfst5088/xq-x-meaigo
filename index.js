@@ -1597,8 +1597,10 @@ var index_default = {
       return await handleApiRequest(request, env);
     }
     if (path === "/admin" || path === "/admin/") {
-      const adminReq = new Request(new URL("/admin.html", request.url).toString(), request);
-      return env.ASSETS.fetch(adminReq);
+      const adminReq = new Request(new URL("/admin.html", request.url).toString(), { method: "GET", headers: { "accept-encoding": "identity" } });
+      const adminResp = await env.ASSETS.fetch(adminReq);
+      const adminBody = await adminResp.text();
+      return new Response(adminBody, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, no-cache, must-revalidate" } });
     }
     if (request.headers.get("Upgrade") === "websocket") {
       const roomId = url.searchParams.get("roomId");
@@ -1614,8 +1616,8 @@ var index_default = {
     }
     if (env.ASSETS) {
       if (path === "/" || path.endsWith(".html")) {
-        const assetReq = new Request(request.url.replace(/\/[^\/]*$/, "/index.html"), request);
-        const assetResp = await env.ASSETS.fetch(assetReq);
+        const assetUrl = new URL(path === "/" ? "/index.html" : path, request.url).toString();
+        const assetResp = await env.ASSETS.fetch(new Request(assetUrl, { method: "GET", headers: { "accept-encoding": "identity" } }));
         const body = await assetResp.text();
         return new Response(body, {
           status: 200,
