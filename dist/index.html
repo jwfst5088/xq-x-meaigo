@@ -6410,8 +6410,8 @@ var rn=(si.red&&si.red.name)?si.red.name:null;
 var bn=(si.black&&si.black.name)?si.black.name:null;
 var idf=window._xqIdentityFields?window._xqIdentityFields():null;
 var my=(idf&&idf.playerName)?idf.playerName:null;
-if(myColor==='red'&&!rn&&my)rn=my;
-if(myColor==='black'&&!bn&&my)bn=my;
+if(myColor==='red'&&(!rn||rn==='游客')&&my)rn=my;
+if(myColor==='black'&&(!bn||bn==='游客')&&my)bn=my;
 if(rn&&typeof D==='function'&&D('redName'))D('redName').textContent=rn;
 if(bn&&typeof D==='function'&&D('blackName'))D('blackName').textContent=bn;
 }catch(e){}
