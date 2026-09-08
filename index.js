@@ -261,10 +261,7 @@ var ChessRoom = class {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       const roomId2 = url.searchParams.get("roomId") || this.ctx.id.toString().split("-").pop();
-      const hasRoomParam = !!url.searchParams.get("roomId");
-      if (!this.room && !(hasRoomParam && this._destroyed)) {
-        await this.initRoom(roomId2);
-      }
+      await this.initRoom(roomId2);
       server.accept();
       this.handleRoomWebSocket(server);
       return new Response(null, { status: 101, webSocket: client });
@@ -346,7 +343,6 @@ var ChessRoom = class {
             clearTimeout(this._cleanupTimer);
             this._cleanupTimer = null;
           }
-if (!this.room || this._destroyed) { await this.initRoom(socketData.roomId || this.ctx.id.toString().split("-").pop()); this._destroyed = false; }
           // 清扫僵尸座位：已关闭/半关闭/已被替换的旧连接不再占用颜色，
           // 防止"离开后同房间号重进"产生同色双座位（卡死根源）
           for (const [pws, p] of [...this.room.players]) {
@@ -398,7 +394,6 @@ if (!this.room || this._destroyed) { await this.initRoom(socketData.roomId || th
             clearTimeout(this._cleanupTimer);
             this._cleanupTimer = null;
           }
-if (!this.room || this._destroyed) { await this.initRoom(socketData.roomId || this.ctx.id.toString().split("-").pop()); this._destroyed = false; }
           // 同上：先清扫僵尸座位再判断房间是否满员
           for (const [pws, p] of [...this.room.players]) {
             const st = pws.readyState;
@@ -612,23 +607,7 @@ if (!this.room || this._destroyed) { await this.initRoom(socketData.roomId || th
         } else if (eventName === "reconnect_room") {
           // 自愈：房间对象已被销毁（如对手离开重建）时，从D1或全新状态恢复，避免静默失败
           if (!this.room) {
-            let hasState = false;
-            try {
-              const savedRow = this.env.CHESS_DB && socketData.roomId ? await this.env.CHESS_DB.prepare("SELECT state FROM room_state WHERE room_id = ?").bind(socketData.roomId).first() : null;
-              hasState = !!(savedRow && savedRow.state);
-            } catch (e1) {
-            }
-            if (!hasState) {
-              try {
-                ws.send(JSON.stringify({ event: "room_closed", data: { reason: "room_gone" } }));
-              } catch (e3) {
-              }
-              return;
-            }
-            try {
-              await this.initRoom(this.room.id);
-            } catch (e2) {
-            }
+            try { await this.initRoom(this.room.id); } catch (e2) {}
           }
           if (!this.room) return;
           try {
@@ -797,7 +776,6 @@ if (!this.room || this._destroyed) { await this.initRoom(socketData.roomId || th
           // 立即销毁: 通知留下的一方(先发结算再发room_closed) → 关闭全部连接 → 删除存档行
           const room = roomLeaving;
           this.room = null;
-          this._destroyed = true;
           if (room._timer) {
             clearInterval(room._timer);
             room._timer = null;
@@ -1747,4 +1725,4 @@ export {
   index_default as default
 };
 //# sourceMappingURL=index.js.map
-
+

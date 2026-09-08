@@ -73,7 +73,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 .overlay .box{background:#2c1810;border-radius:14px;padding:24px 18px;text-align:center;max-width:280px;width:90%;border:1px solid #5a3a28}
 .overlay h2{font-size:20px;color:#d4a843;margin-bottom:4px}
 .overlay p{font-size:13px;color:#c4a882;margin-bottom:14px}
-.overlay .btns2{display:flex;gap:8px;justify-content:center}
+.overlay .btns2{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .chat-display{height:24px;line-height:24px;padding:0 10px;text-align:center;background:#1a0f0a;border-bottom:1px solid #3d2117;color:#d4a843;font-size:13px;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .chat-area{display:flex;gap:8px;padding:8px;background:#2c1810;border-top:1px solid #5a3a28;flex-shrink:0}
 .chat-input{flex:1;padding:6px 10px;border:1px solid #5a3a28;border-radius:8px;background:#3d2117;color:#f0e6d3;font-size:13px;outline:none}
@@ -6465,11 +6465,12 @@ window._xqRoomClosed=true;
 try{socket.reconnection=false;}catch(e){}
 try{socket.disconnect();}catch(e){}
 try{hideReconnecting();}catch(e){}
+try{toast('对弈已结束',2500);}catch(e){}
 setTimeout(function(){
 window._xqRoomClosed=false;window._goHandled=false;
 try{hideOverlay();}catch(e){}
 try{if(gm==='online'){doLeaveGame();}else{returnToLobby();}}catch(e){}
-try{toast('房间已解散（对手已退出）',2200);}catch(e){}
+try{toast('已返回大厅',1800);}catch(e){}
 },5000);
 });
 }catch(e){}
@@ -6651,7 +6652,7 @@ var ob=$id('overlayBox');
 if(ob&&!$id('btnReview')){
 var b=document.createElement('button');
 b.id='btnReview';b.className='btn btn-outline';
-b.style.cssText='width:auto;padding:10px 20px;font-size:14px;background:#8e44ad;color:#fff;border-color:#7d3c98';
+b.style.cssText='width:auto;flex:1 1 100%;padding:10px 20px;font-size:14px;background:#8e44ad;color:#fff;border-color:#7d3c98';
 b.textContent='📋 AI复盘';
 b.onclick=function(){openReview();};
 var btns=ob.querySelector('.btns2');
@@ -6664,7 +6665,8 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 window.openReview=function(){
 var snap=window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
-window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;window._rvSavedEngine=null;
+window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;
+try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:null,idx:0}));}catch(e){}window._rvSavedEngine=null;
 hideOverlay();
 var old=$id('rvPanel');if(old)old.remove();
 var pnl=document.createElement('div');
@@ -6772,7 +6774,7 @@ pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">
 +'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
 var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}
 try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}
-computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);
+try{if(d.plies&&d.plies.length){computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);}else{var st0=$id('rvStatus');if(st0)st0.textContent='分析中…';runAnalysis(d.snap);}}catch(e2){}
 }catch(e){}
 };window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
