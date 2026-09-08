@@ -1524,7 +1524,7 @@ else if(window._pendingReconnect){var pr=window._pendingReconnect;if(pr.redLeft!
 else if(gm==='online'&&myRm){socket.emit('reconnect_room',Object.assign({roomId:myRm,color:myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
 window._isPageReload=isPageReload;
 });
-socket.on('disconnect',function(){sockOk=false;disconnectTime=Date.now();if(gm==='online'&&myRm){showReconnecting();}});
+socket.on('disconnect',function(){if(window._xqRoomClosed)return;sockOk=false;disconnectTime=Date.now();if(gm==='online'&&myRm){showReconnecting();}});
 socket.on('ping',function(){socket.emit('pong');});
 socket.on('connect_error',function(){sockOk=false;D('lobbyStatus').textContent='○ 连接失败（本地模式可用）';});
 socket.on('online_count',function(count){D('onlineCount').textContent='当前在线: '+count+' 人';});
@@ -6451,10 +6451,11 @@ showOverlay('<h2>🏆 对手已退出对局</h2><p>你获得本局胜利，棋�
 socket.on('room_closed',function(d){
 if(window._xqRoomClosed)return;
 window._xqRoomClosed=true;
-var _sk=socket;
+try{socket.reconnection=false;}catch(e){}
+try{socket.disconnect();}catch(e){}
+try{hideReconnecting();}catch(e){}
 setTimeout(function(){
 window._xqRoomClosed=false;window._goHandled=false;
-try{if(_sk){_sk.reconnection=false;_sk.disconnect();}}catch(e){}
 try{hideOverlay();}catch(e){}
 try{if(gm==='online'){doLeaveGame();}else{returnToLobby();}}catch(e){}
 try{toast('房间已解散（对手已退出）',2200);}catch(e){}
