@@ -753,44 +753,49 @@ var ChessRoom = class {
             this.room.spectators.delete(ws);
             return;
           }
-          // 对局进行中主动退出 = 逃跑判负: 对方立即获胜并按段位差计分, 房间保留给留下的一方
-          if (this.room.gameStarted && !this.room.gameOver && socketData.color && !this.room._ratedRecorded) {
-            this.room.gameOver = true;
-            this.room._gameEndedAt = Date.now();
-            this.room.winner = socketData.color === "red" ? "black" : "red";
-            if (this.room._timer) {
-              clearInterval(this.room._timer);
-              this.room._timer = null;
-            }
-            if (this.room._disconnectTimer) {
-              clearTimeout(this.room._disconnectTimer);
-              this.room._disconnectTimer = null;
-            }
-            this.broadcastToOpponent(ws, JSON.stringify({ event: "game_over", data: { winner: this.room.winner, reason: "opponent_left" } }));
-            this.ctx.waitUntil(this._recordGameEnd("opponent_left"));
-            this.ctx.waitUntil(this._saveRoomState());
-          }
+          // 按返回按钮退出: 房间立即销毁
+          // 计分规则: 棋已开下(非初始盘面)且未分胜负 → 离开者直接判负扣分; 初始盘面或已有输赢 → 不扣分
           const roomLeaving = this.room;
-          const teardownEmpty = roomLeaving.gameOver ? roomLeaving.players.size <= 1 : true;
-          roomLeaving.players.delete(ws);
-          if (socketData.color && this.disconnected[socketData.color]) delete this.disconnected[socketData.color];
-          if (!teardownEmpty) {
-            // 留下的一方继续留在房间看结果
-            try {
-              ws.close();
-            } catch (e) {
+          const initPosition = !roomLeaving.moveHistory || roomLeaving.moveHistory.length === 0;
+          let judgedWinner = null;
+          if (roomLeaving.gameStarted && !roomLeaving.gameOver && socketData.color && !roomLeaving._ratedRecorded && !initPosition) {
+            roomLeaving.gameOver = true;
+            roomLeaving._gameEndedAt = Date.now();
+            roomLeaving.winner = socketData.color === "red" ? "black" : "red";
+            judgedWinner = roomLeaving.winner;
+            if (roomLeaving._timer) {
+              clearInterval(roomLeaving._timer);
+              roomLeaving._timer = null;
             }
-            return;
+            if (roomLeaving._disconnectTimer) {
+              clearTimeout(roomLeaving._disconnectTimer);
+              roomLeaving._disconnectTimer = null;
+            }
+            this.ctx.waitUntil(this._recordGameEnd("opponent_left"));
           }
+          // 立即销毁: 通知留下的一方(先发结算再发room_closed) → 关闭全部连接 → 删除存档行
           const room = roomLeaving;
           this.room = null;
           if (room._timer) {
             clearInterval(room._timer);
             room._timer = null;
           }
+          if (room._disconnectTimer) {
+            clearTimeout(room._disconnectTimer);
+            room._disconnectTimer = null;
+          }
+          if (this._cleanupTimer) {
+            clearTimeout(this._cleanupTimer);
+            this._cleanupTimer = null;
+          }
+          this.disconnected = {};
+          room.players.delete(ws);
           for (const [pws] of room.players) {
             try {
-              pws.send(JSON.stringify({ event: "opponent_left", data: {} }));
+              if (judgedWinner) {
+                pws.send(JSON.stringify({ event: "game_over", data: { winner: judgedWinner, reason: "opponent_left" } }));
+              }
+              pws.send(JSON.stringify({ event: "room_closed", data: { reason: "opponent_left" } }));
             } catch (e) {
             }
           }
@@ -814,11 +819,6 @@ var ChessRoom = class {
             if (this.env.CHESS_DB) this.env.CHESS_DB.prepare("DELETE FROM room_state WHERE room_id = ?").bind(room.id).run();
           } catch (e) {
           }
-          if (this._cleanupTimer) {
-            clearTimeout(this._cleanupTimer);
-            this._cleanupTimer = null;
-          }
-          this.disconnected = {};
         }
       } catch (e) {
         console.error("Room WebSocket message error:", e);

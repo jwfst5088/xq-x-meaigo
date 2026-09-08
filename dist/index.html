@@ -6433,19 +6433,24 @@ if(typeof socket!=='undefined'&&socket){
 try{socket.on('rating_update',function(d){window._xqOnRatingUpdate(d);});}catch(e){}
 try{
 socket.on('game_over',function(d){
-if(!d||window._autoLobbyDone)return;
-if(d.reason==='opponent_left'||d.reason==='disconnect_timeout'){
-window._autoLobbyDone=true;
+if(!d||window._goHandled)return;
+if(d.reason==='opponent_left'){
+window._goHandled=true;
 if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
-var _n=20;
-var _txt=d.reason==='opponent_left'?'对手已退出对局':'对手断线超时';
-showOverlay('<h2>🏆 '+_txt+'</h2><p>你获得本局胜利，棋力分已结算。</p><p style="font-size:18px;color:#d4a843"><b id="_autoLobbyN">'+_n+'</b> 秒后自动返回大厅</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="hideOverlay();doLeaveGame()">立即返回大厅</button></div>');
-window._dcTimer=setInterval(function(){
-_n--;
-var el=document.getElementById('_autoLobbyN');if(el)el.textContent=_n;
-if(_n<=0){clearInterval(window._dcTimer);window._dcTimer=null;hideOverlay();try{doLeaveGame();}catch(e){}}
-},1000);
+showOverlay('<h2>🏆 对手已退出对局</h2><p>你获得本局胜利，棋力分已结算。</p><p style="color:#9ab">房间即将解散，自动返回大厅…</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="doLeaveGame()">立即返回大厅</button></div>');
 }
+});
+socket.on('room_closed',function(d){
+if(window._xqRoomClosed)return;
+window._xqRoomClosed=true;
+var _sk=socket;
+setTimeout(function(){
+window._xqRoomClosed=false;window._goHandled=false;
+try{if(_sk){_sk.reconnection=false;_sk.disconnect();}}catch(e){}
+try{hideOverlay();}catch(e){}
+try{if(gm==='online'){doLeaveGame();}else{returnToLobby();}}catch(e){}
+try{toast('房间已解散（对手已退出）',2200);}catch(e){}
+},1600);
 });
 }catch(e){}
 try{
