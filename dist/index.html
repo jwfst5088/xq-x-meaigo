@@ -1547,6 +1547,7 @@ try{localStorage.setItem('xq_last_color',d.color);}catch(e){} // 记录本盘颜
 enterOnlineGame(d.roomId,d.color);
 });
 socket.on('game_start',function(d){
+window._xqGhostGuard=false;
 gameStarted=true;D('turnText').textContent=engine.currentTurn==='red'?'红方走棋':'黑方走棋';
 updateBoardSize();drawBoardBg();render();
 toast('对手已加入，对局开始!',2000);startTimer();
@@ -1656,6 +1657,8 @@ D('blackName').textContent=myCl==='black'?'你（黑方）':'对手（黑方）'
 D('drawBtn').style.display='inline-flex';
 boardFlip=(myCl==='black');
 var isPageReload=window._isPageReload;window._isPageReload=false;
+if(d.moveHistory&&d.moveHistory.length>0){window._xqGhostGuard=false;}
+if(window._xqGhostGuard&&d.moveHistory&&d.moveHistory.length===0&&engine.moveHistory.length>0){try{toast('房间已解散，保留本地复盘棋局',2000);}catch(e){}return;}
 // 本地领先保护：本地恰好比服务端多1步且正是 pendingMove（未确认走棋）时，
 // 全量同步不应覆盖本地（防止"刚走的棋回退"），等待 move_ack 或自动补发
 var localPendingAhead=false;
@@ -1756,6 +1759,7 @@ var reconnectRetryTimer=null,reconnectRetryCount=0,reconnectRetryMax=200;
 var disconnectTime=0;
 
 function saveGameState(){
+if(window._rvSavedEngine)return;
 if(gm==='ai'||gm==='pikafish'){
 try{
 var st={gm:gm,myCl:myCl,aiCl:aiCl,currentTurn:engine.currentTurn,gameOver:engine.gameOver,winner:engine.winner,moveHistory:engine.moveHistory.slice(),capRed:capRed.slice(),capBlk:capBlk.slice(),redLeft:redLeft,blkLeft:blkLeft,lastMove:lastMove,undoUsed:undoUsed};
@@ -6244,7 +6248,7 @@ engine.initBoard();
 capRed=[];capBlk=[];lastMove=null;
 if(g.moveHistory){for(var i=0;i<g.moveHistory.length;i++){var m=g.moveHistory[i];var rs=engine.move(m.fromRow,m.fromCol,m.toRow,m.toCol);if(rs&&rs.captured){if(rs.captured.color==='red')capRed.push(rs.captured);else capBlk.push(rs.captured);}}}
 if(g.moveHistory&&g.moveHistory.length>0){var lm=g.moveHistory[g.moveHistory.length-1];lastMove={row:lm.toRow,col:lm.toCol};}
-if(g.capRed)capRed=g.capRed;if(g.capBlk)capBlk=g.capBlk;
+if(g.capRed)capRed=g.capRed;if(g.capBlk)capBlk=g.capBlk;if(g.moveHistory&&g.moveHistory.length>0){window._xqGhostGuard=true;}
 if(g.redLeft!=null){redLeft=g.redLeft;blkLeft=g.blkLeft;}
 engine.currentTurn=g.currentTurn||'red';engine.gameOver=g.gameOver||false;engine.winner=g.winner||null;
 undoUsed=g.undoUsed||false;
