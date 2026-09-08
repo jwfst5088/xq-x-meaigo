@@ -177,7 +177,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 .rv-close{background:transparent;border:none;color:#8b7355;font-size:13px;cursor:pointer;padding:2px 6px;font-family:inherit}
 .rv-close:hover{color:#d4a843}
 @media(min-width:1000px){#rvPanel{right:16px;top:60px;width:340px}}
-@media(max-width:999px){#rvPanel{left:50%;transform:translateX(-50%);bottom:12px;max-height:42vh;overflow-y:auto}body.rv-open #game{padding-bottom:40vh}}
+@media(max-width:999px){#rvPanel{position:static;transform:none;margin:8px auto 10px;width:calc(100% - 16px);max-height:none;overflow:visible}}
 @media(min-width:1000px){
 .lb-body{flex-direction:row;align-items:flex-start;max-width:1240px;margin:0 auto;gap:24px;padding:0 20px;box-sizing:border-box}
 .lb-main{padding-top:46px}
@@ -1400,6 +1400,7 @@ function leaveGame(){
 showOverlay('<h2>退出对局</h2><p>确认退出当前对局？</p><div class="btns2"><button class="btn btn-red" onclick="doLeaveGame()">确认退出</button><button class="btn btn-outline" onclick="hideOverlay()">取消</button></div>');
 }
 function returnToLobby(){
+window._xqFinGame=(typeof engine!=='undefined'&&engine&&engine.gameOver)?1:0;
 try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 soundEnabled=false;gameOverSoundPlayed=false;
 if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
@@ -1408,9 +1409,10 @@ gm='local';myCl=null;myRm=null;boardFlip=false;D('drawBtn').style.display='none'
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent=sockOk?'● 服务器已连接':'○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
-try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_game');}catch(e){}
+try{if(!window._xqFinGame){localStorage.removeItem('xq_game');}sessionStorage.removeItem('xq_game');}catch(e){}
 }
 function doLeaveGame(){
+window._xqFinGame=(typeof engine!=='undefined'&&engine&&engine.gameOver)?1:0;
 try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 if(document.fullscreenElement||document.webkitFullscreenElement){
 if(document.exitFullscreen)document.exitFullscreen();
@@ -1425,7 +1427,7 @@ gm='local';myCl=null;myRm=null;boardFlip=false;D('drawBtn').style.display='none'
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent='○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
-try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_game');}catch(e){}
+try{if(!window._xqFinGame){localStorage.removeItem('xq_game');}sessionStorage.removeItem('xq_game');}catch(e){}
 connectSocket();
 }
 function leaveGameSilent(){
@@ -1531,6 +1533,7 @@ socket.on('ping',function(){socket.emit('pong');});
 socket.on('connect_error',function(){sockOk=false;D('lobbyStatus').textContent='○ 连接失败（本地模式可用）';});
 socket.on('online_count',function(count){D('onlineCount').textContent='当前在线: '+count+' 人';});
 socket.on('room_created',function(d){
+try{localStorage.removeItem('xq_game');}catch(e){}
 myRm=d.roomId;myCl=d.color;gm='online';
 try{localStorage.setItem('xq_last_color',d.color);}catch(e){} // 记录本盘颜色，下一盘轮换先手
 D('lobbyStatus').innerHTML='房间号: <strong style="font-size:20px;color:#d4a843;letter-spacing:3px;">'+d.roomId+'</strong>';
@@ -1542,6 +1545,7 @@ window._pendingRoomAction=d;
 socket.reconnectToRoom(d.roomId);
 });
 socket.on('room_joined',function(d){
+try{localStorage.removeItem('xq_game');}catch(e){}
 myRm=d.roomId;myCl=d.color;gm='online';D('lobbyStatus').textContent='';
 try{localStorage.setItem('xq_last_color',d.color);}catch(e){} // 记录本盘颜色，下一盘轮换先手
 enterOnlineGame(d.roomId,d.color);
@@ -6669,7 +6673,7 @@ pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">
 +'<canvas id="rvCurve" width="460" height="110" style="width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
 +'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
-document.body.appendChild(pnl);try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}runAnalysis(snap);
+var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
 var total=snap.moves.length;
