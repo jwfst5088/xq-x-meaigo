@@ -1583,7 +1583,7 @@ async function handleApiRequest(request, env) {
   }
   if (path === "/api/create-room") {
     const customId = url.searchParams.get("id");
-    const roomId = customId || Math.random().toString(36).slice(2, 8).toUpperCase();
+    const roomId = customId || String(Math.floor(1000 + Math.random() * 9000));
     return new Response(JSON.stringify({ roomId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   return new Response(JSON.stringify({ error: "Not found" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
@@ -1667,7 +1667,7 @@ async function handleWebSocket(ws, env) {
         } else {
           requestedRoomId = payload;
         }
-        const roomId = requestedRoomId || Math.random().toString(36).slice(2, 8).toUpperCase();
+        const roomId = requestedRoomId || String(Math.floor(1000 + Math.random() * 9000));
         ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
       } else if (eventName === "ping") {
         try {
