@@ -5912,7 +5912,7 @@ function applyCloudMove(moveStr){
 function startAiThink(){
 if(aiThinking||engine.gameOver||engine.currentTurn!==aiCl)return;
 aiThinking=true;
-D('turnText').textContent='云端AI思考中...';
+D('turnText').textContent='AI思考中...';
 var fen=boardToFen(engine.board,engine.currentTurn);
 var settled=false;   // 防止云库迟到的响应与本地回退重复落子
 var useLocal=function(){
