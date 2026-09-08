@@ -196,7 +196,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="lb-main">
 <div class="hero-slogan">对 弈 · 竞 技 · 升 段</div>
 <button id="matchBtn" class="match-cta" onclick="quickMatch()">⚡ 快速匹配</button>
-<div id="matchHint" class="hero-hint">按等级分自动配对 · 段位对战 · 60秒未匹配可取消</div>
+<div id="matchHint" class="hero-hint">按等级分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分</div>
 <div class="join-grid">
 <div class="join"><input id="createInput" placeholder="留空自动生成房间号" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')createRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="createRoom()">创建房间</button></div>
 <div class="join"><input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入房间</button></div>
@@ -6369,6 +6369,7 @@ if(_matching){cancelMatch();toast('已取消匹配');return;}
 if(typeof sockOk==='undefined'||!sockOk){toast('服务器未连接，请稍候再试');return;}
 if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){toast('已在对局中');return;}
 _matching=true;_matchStarted=Date.now();
+var btn0=$id('matchBtn');if(btn0)btn0.textContent='⏳ 匹配中…';
 api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())}).then(function(r){
 if(!r||!r.ok){_matching=false;resetMatchBtn();toast(r&&r.error?r.error:'匹配服务不可用');return;}
 _matchTicket=r.ticket;
@@ -6379,10 +6380,21 @@ pollMatch();
 };
 function pollMatch(){
 if(!_matching||!_matchTicket)return;
+// 用户已手动进入对局：停止匹配轮询
+if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){cancelMatch();return;}
+var waited=Math.floor((Date.now()-_matchStarted)/1000);
+var btn=$id('matchBtn');
+if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
+// 15秒无人：明示AI补位（按商业化方案，AI对局不计分）
+if(waited>=15){
+cancelMatch();
+toast('⚡ 当前在线较少，已为您匹配 AI 对手陪练',2800);
+if(typeof startAiGame==='function'){startAiGame();}
+return;
+}
 api('/api/match/status?ticket='+encodeURIComponent(_matchTicket)).then(function(r){
 if(!_matching)return;
 if(r&&r.state==='paired'){_matching=false;_matchTicket=null;resetMatchBtn();toast('🎯 已匹配对手，进入对局!',2000);enterMatchRoom(r.roomId);return;}
-if(Date.now()-_matchStarted>60000){cancelMatch();toast('匹配超时，试试创建房间或人机对弈',2800);return;}
 _matchTimer=setTimeout(pollMatch,2000);
 }).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
 }
