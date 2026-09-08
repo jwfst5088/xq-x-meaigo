@@ -1161,7 +1161,7 @@ var MatchQueue = class {
     const now = Date.now();
     this.queue = this.queue.filter((e) => now - e.ts < 12e4);
     if (this.queue.length < 2) return;
-    const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
+const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
     const pairedTickets = /* @__PURE__ */ new Set();
     for (let i = 0; i < sorted.length; i++) {
       const a = sorted[i];

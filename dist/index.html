@@ -6307,6 +6307,14 @@ if(!d||d.length<3){d='D'+Math.random().toString(36).slice(2,10)+Date.now().toStr
 return d;}
 function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return null;}}
 window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||(p&&p.name)||null,elo:(p&&p.elo)?p.elo:-160};};
+window._xqEnsureProfile=async function(){
+try{
+if(window._xqProfile&&window._xqProfile.elo!=null)return window._xqProfile;
+var r=await api('/api/player/register',{method:'POST',body:JSON.stringify({deviceId:getDev(),name:getName()||null})});
+if(r&&r.player){window._xqProfile=r.player;renderProfile(r.player);}
+}catch(e){}
+return window._xqProfile;
+};
 window._xqMyName=function(){try{return getName()||(window._xqProfile&&window._xqProfile.name)||'游客';}catch(e){return '游客';}};
 function renderProfile(p){
 var box=$id('profileBox');if(!box||!p)return;
@@ -6529,7 +6537,7 @@ _matching=true;_matchStarted=Date.now();
 ensureLobbySocket();
 var btn0=$id('matchBtn');if(btn0)btn0.textContent='⏳ 匹配中…';
 var hint=$id('matchHint');if(hint){hint.textContent='正在加入匹配队列…';hint.style.color='#c4a882';}
-api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())}).then(function(r){
+Promise.resolve(window._xqEnsureProfile?window._xqEnsureProfile():null).then(function(){return api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())});}).then(function(r){
 if(!r||!r.ok){_matching=false;resetMatchBtn();var m=(r&&r.error)?r.error:'匹配服务不可用';toast(m);var h=$id('matchHint');if(h){h.textContent='❌ '+m;h.style.color='#e74c3c';}return;}
 _matchTicket=r.ticket;
 var btn=$id('matchBtn');
@@ -6544,7 +6552,7 @@ if(!_matching||!_matchTicket)return;
 if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){cancelMatch();return;}
 var waited=Math.floor((Date.now()-_matchStarted)/1000);
 var btn=$id('matchBtn');
-if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
+if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s'+(waited>=6?' · '+(30-waited)+'s后AI补位':'');
 // 30秒无人：看在线人数决定（≥2人在线继续等真人，60秒硬上限后AI补位）
 if(waited>=30){
 var oc=(typeof D==='function'&&D('onlineCount'))?D('onlineCount').textContent:'';
