@@ -1781,7 +1781,7 @@ sessionStorage.setItem('xq_game','1');
 }
 
 function clearGameState(){
-try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_game');}catch(e){}
+ try{if(!(typeof engine!==' ' + 'undefined' + ' + '&&engine&&engine.gameOver)){localStorage.removeItem('xq_game');}sessionStorage.removeItem('xq_game');}catch(e){}
 }
 
 function loadGameState(){
