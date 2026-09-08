@@ -320,7 +320,7 @@ var ChessRoom = class {
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
             this._setSeatIdentity(myColor, payload);
-            ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
+            ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid, seatInfo: this.getRoomState().seatInfo } }));
           } else {
             let myColor;
             if (lastColor === "red") {
@@ -336,7 +336,7 @@ var ChessRoom = class {
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
             this._setSeatIdentity(myColor, payload);
-            ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
+            ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid, seatInfo: this.getRoomState().seatInfo } }));
           }
         } else if (eventName === "join_room") {
           if (this._cleanupTimer) {
@@ -359,7 +359,7 @@ var ChessRoom = class {
             socketData.color = firstColor;
             this._setSeatIdentity(firstColor, payload);
             try {
-              ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: firstColor, pid: firstPid } }));
+              ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: firstColor, pid: firstPid, seatInfo: this.getRoomState().seatInfo } }));
             } catch (e) {
             }
             this.broadcastRoomState();
@@ -379,9 +379,9 @@ var ChessRoom = class {
           socketData.color = color;
           this._setSeatIdentity(color, payload);
           if (this.room.players.size >= 2) this.room.gameStarted = true;
-          ws.send(JSON.stringify({ event: "room_joined", data: { roomId: this.room.id, color, pid: joinPid } }));
+          ws.send(JSON.stringify({ event: "room_joined", data: { roomId: this.room.id, color, pid: joinPid, seatInfo: this.getRoomState().seatInfo } }));
           this.broadcastRoomState();
-          this.broadcastToPlayers(JSON.stringify({ event: "game_start", data: { currentTurn: this.room.currentTurn } }));
+          this.broadcastToPlayers(JSON.stringify({ event: "game_start", data: { currentTurn: this.room.currentTurn, seatInfo: this.getRoomState().seatInfo } }));
           this.startRoomTimer();
         } else if (eventName === "make_move") {
           if (!this.room || this.room.gameOver) {

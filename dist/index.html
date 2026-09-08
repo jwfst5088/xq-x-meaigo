@@ -169,6 +169,12 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 #lobby .footer{width:100%;text-align:center;margin-top:auto;padding:10px}
 .auth-input{width:100%;padding:12px;border:2px solid #5a3a28;border-radius:10px;background:#1a0f0a;color:#f0e6d3;font-size:15px;outline:none;margin:10px 0 14px;box-sizing:border-box;font-family:inherit}
 .auth-input:focus{border-color:#d4a843}
+#rvPanel{position:fixed;z-index:150;background:#2c1810;border:1px solid #5a3a28;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);width:480px;max-width:calc(100vw - 20px);box-sizing:border-box}
+.rv-head{display:flex;justify-content:space-between;align-items:center}
+.rv-close{background:transparent;border:none;color:#8b7355;font-size:13px;cursor:pointer;padding:2px 6px;font-family:inherit}
+.rv-close:hover{color:#d4a843}
+@media(min-width:1000px){#rvPanel{right:16px;top:60px;width:340px}}
+@media(max-width:999px){#rvPanel{left:50%;transform:translateX(-50%);bottom:12px}}
 @media(min-width:1000px){
 .lb-body{flex-direction:row;align-items:flex-start;max-width:1240px;margin:0 auto;gap:24px;padding:0 20px;box-sizing:border-box}
 .lb-main{padding-top:46px}
@@ -6313,10 +6319,30 @@ api('/api/player/register',{method:'POST',body:JSON.stringify({deviceId:getDev()
 }
 registerProfile();
 
-// ---------- 等级分变更提示 ----------
-function attachRatingHandler(){
+// ---------- 等级分变更提示 + 座位名字显示 ----------
+function applySeatNames(si,myColor){
+try{
+if(!si)return;
+var rn=(si.red&&si.red.name)?si.red.name:null;
+var bn=(si.black&&si.black.name)?si.black.name:null;
+var idf=window._xqIdentityFields?window._xqIdentityFields():null;
+var my=(idf&&idf.playerName)?idf.playerName:null;
+if(myColor==='red'&&!rn&&my)rn=my;
+if(myColor==='black'&&!bn&&my)bn=my;
+if(rn&&typeof D==='function'&&D('redName'))D('redName').textContent=rn;
+if(bn&&typeof D==='function'&&D('blackName'))D('blackName').textContent=bn;
+}catch(e){}
+}
+function attachP1Handlers(){
 if(typeof socket!=='undefined'&&socket){
 try{socket.on('rating_update',function(d){window._xqOnRatingUpdate(d);});}catch(e){}
+try{
+var nm=function(d){applySeatNames(d&&d.seatInfo,(typeof myCl!=='undefined')?myCl:null);};
+socket.on('room_created',nm);
+socket.on('room_joined',nm);
+socket.on('game_start',nm);
+socket.on('room_state',nm);
+}catch(e){}
 }
 }
 window._xqOnRatingUpdate=function(d){
@@ -6327,10 +6353,10 @@ if(prev&&prev.elo!==r.player.elo){var diff=r.player.elo-prev.elo;toast((diff>=0?
 }).catch(function(){});
 }catch(e){}
 };
-attachRatingHandler();
+attachP1Handlers();
 if(typeof connectSocket==='function'){
 var _origConnectSocket=connectSocket;
-window.connectSocket=function(){_origConnectSocket();setTimeout(attachRatingHandler,0);};
+window.connectSocket=function(){_origConnectSocket();setTimeout(attachP1Handlers,0);};
 }
 
 // ---------- 排行榜 ----------
@@ -6492,18 +6518,17 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 window.openReview=function(){
 var snap=window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
-window._rvSnap=snap;window._rvPlies=null;
-var html='<h2>📋 AI复盘</h2>';
-html+='<div id="rvStatus" style="font-size:13px;color:#d4a843;margin:6px 0">引擎准备中…</div>';
-html+='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:820px">';
-html+='<div><canvas id="rvCurve" width="500" height="140" style="width:500px;max-width:96vw;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>';
-html+='<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:20px">分析完成后点击棋谱查看局面</div>';
-html+='<canvas id="rvBoard" width="270" height="300" style="width:270px;max-width:60vw;background:#f0d9b5;border-radius:4px"></canvas>';
-html+='<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button id="rvPrev" class="btn btn-outline" style="width:auto;padding:8px 18px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button id="rvNext" class="btn btn-outline" style="width:auto;padding:8px 18px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button></div></div>';
-html+='<div id="rvList" style="max-width:280px;max-height:440px;overflow-y:auto;font-size:12px;text-align:left;line-height:2;min-width:240px"></div>';
-html+='</div>';
-html+='<div class="btns2" style="margin-top:8px"><button class="btn btn-outline" style="width:auto;padding:8px 16px" onclick="hideOverlay()">关闭</button></div>';
-showOverlay(html);
+window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;window._rvSavedEngine=null;
+hideOverlay();
+var old=$id('rvPanel');if(old)old.remove();
+var pnl=document.createElement('div');
+pnl.id='rvPanel';
+pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">📋 AI复盘</span><button class="rv-close" onclick="closeReview()" title="关闭复盘">✕ 关闭</button></div>'
++'<div id="rvStatus" style="font-size:12px;color:#d4a843;margin:4px 0">引擎准备中…</div>'
++'<canvas id="rvCurve" width="460" height="110" style="width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
++'<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
++'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
+document.body.appendChild(pnl);
 runAnalysis(snap);
 };
 function runAnalysis(snap){
@@ -6533,9 +6558,9 @@ function finish(){
 window._rvPlies=plies;
 computeDrops(plies);
 drawCurve(plies);
-buildMoveList(plies,snap);
-var st=$id('rvStatus');if(st)st.textContent='✅ 复盘完成 · 点击右侧棋谱查看局面与评估';
-if(plies.length){window._rvIdx=0;var rev2=buildEngineToPly(1,snap.moves);drawMiniBoard(rev2);}
+var st=$id('rvStatus');if(st)st.textContent='✅ 复盘完成 · 用下方按钮逐着回放';
+if(plies.length){showRvPly(0);}
+else{var d=$id('rvDetail');if(d)d.textContent='无有效评估数据';}
 }
 }
 function buildEngineToPly(n,moves){
@@ -6587,61 +6612,41 @@ ctx.beginPath();ctx.arc(X(i),Y(mover==='red'?wi:100-wi),4,0,Math.PI*2);ctx.fill(
 }
 }
 }
-function buildMoveList(plies,snap){
-var lst=$id('rvList');if(!lst)return;
-var h='';
-for(var i=0;i<plies.length;i++){
-var p=plies[i];
-var m=p.played;
-var pieceChar='';
-try{var pc=snap.moves[i].piece;pieceChar=(typeof PN!=='undefined'&&PN[pc.type]&&PN[pc.type][pc.color])?PN[pc.type][pc.color]:'';}catch(e){}
-var w=p.score?scoreToRedWin(p.score,p.turn):null;
-var wTxt=w==null?'-':Math.round(w)+'%';
-var mark=(p.drop!==undefined&&p.drop>=45)?' <span style="color:#e74c3c;font-weight:700">??</span>':(p.drop!==undefined&&p.drop>=25)?' <span style="color:#f39c12;font-weight:700">?</span>':'';
-h+='<div style="cursor:pointer;padding:0 4px;border-radius:4px" onmouseover="this.style.background=\'#2a1810\'" onmouseout="this.style.background=\'\'" onclick="showRvPly('+i+')">';
-h+='<span style="color:#8b7355">'+(i+1)+'.</span> <span style="color:'+(p.turn==='red'?'#e74c3c':'#aaa')+'">'+(p.turn==='red'?'红':'黑')+' '+pieceChar+'</span> ('+m.fr+','+m.fc+')→('+m.tr+','+m.tc+') <span style="color:#2ecc71">'+wTxt+'</span>'+mark+'</div>';
-}
-lst.innerHTML=h;
-}
-function drawMiniBoard(rev){
-var cv=$id('rvBoard');if(!cv)return;var ctx=cv.getContext('2d');
-var W=cv.width,H=cv.height,cw=W/9,ch=H/10;
-ctx.fillStyle='#e8d0aa';ctx.fillRect(0,0,W,H);
-ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
-for(var r=0;r<10;r++){ctx.beginPath();ctx.moveTo(cw/2,ch/2+r*ch);ctx.lineTo(cw/2+8*cw,ch/2+r*ch);ctx.stroke();}
-for(var c=0;c<9;c++){ctx.beginPath();ctx.moveTo(cw/2+c*cw,ch/2);ctx.lineTo(cw/2+c*cw,ch/2+9*ch);ctx.stroke();}
-for(var r=0;r<10;r++)for(var c=0;c<9;c++){
-var p=rev.board[r][c];if(!p)continue;
-var x=cw/2+c*cw,y=ch/2+r*ch;
-ctx.beginPath();ctx.arc(x,y,Math.min(cw,ch)*0.42,0,Math.PI*2);
-ctx.fillStyle=p.color==='red'?'#fff0e0':'#e0e0e0';ctx.fill();
-ctx.strokeStyle=p.color==='red'?'#c0392b':'#333';ctx.lineWidth=2;ctx.stroke();
-ctx.fillStyle=p.color==='red'?'#c0392b':'#111';
-ctx.font='bold '+Math.floor(Math.min(cw,ch)*0.52)+'px serif';
-ctx.textAlign='center';ctx.textBaseline='middle';
-var t=(typeof PN!=='undefined'&&PN[p.type]&&PN[p.type][p.color])?PN[p.type][p.color]:'子';
-ctx.fillText(t,x,y+1);
-}
-}
 window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
 if(i<0)i=0;if(i>plies.length-1)i=plies.length-1;
 window._rvIdx=i;
 var rev=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
-drawMiniBoard(rev);
+rev.gameOver=true;
+if(!window._rvSavedEngine)window._rvSavedEngine=engine;
+engine=rev;
+var m=snap.moves[i];
+lastMove={row:m.toRow,col:m.toCol};
+selected=null;validMoves=[];
+drawBoardBg();render();
+if(typeof D==='function'&&D('turnText'))D('turnText').textContent='📋 复盘 · 第'+(i+1)+'手';
 var p=plies[i];var d=$id('rvDetail');if(!d)return;
 var w=p?scoreToRedWin(p.score,p.turn):null;
 var wTxt=(w==null)?'评估不可用':'红方胜率 '+w.toFixed(0)+'%';
 var dropTxt=(p&&p.drop!==undefined&&p.drop>=25)?(' · <span style="color:'+(p.drop>=45?'#e74c3c':'#f39c12')+'">此步失分 '+p.drop.toFixed(0)+'</span>'):'';
-d.innerHTML='第'+(i+1)+'步（'+(p&&p.turn==='red'?'红':'黑')+'方走后局面）· '+wTxt+dropTxt;
+d.innerHTML='第'+(i+1)+'手（'+(p&&p.turn==='red'?'红':'黑')+'方走后）· '+wTxt+dropTxt;
 };
 window.rvStep=function(dir){
 var plies=window._rvPlies;if(!plies||!plies.length)return;
+if(!$id('rvPanel'))return;
 var i=(window._rvIdx===undefined||window._rvIdx===null)?-1:window._rvIdx;
 i+=dir;
-if(i<0){toast('已经是第一步之前');return;}
+if(i<0){toast('已经是开局');return;}
 if(i>plies.length-1){toast('已经是最后一步');return;}
 showRvPly(i);
+};
+window.closeReview=function(){
+window._rvPlies=null;window._rvIdx=-1;
+var pnl=$id('rvPanel');if(pnl)pnl.remove();
+if(window._rvSavedEngine){engine=window._rvSavedEngine;window._rvSavedEngine=null;}
+lastMove=null;selected=null;validMoves=[];
+drawBoardBg();render();
+if(typeof D==='function'&&D('turnText')&&typeof engine!=='undefined'&&engine){D('turnText').textContent=engine.winner?(engine.winner==='draw'?'和棋':(engine.winner==='red'?'红方胜':'黑方胜')):'红方走棋';}
 };
 })();
 </script>
