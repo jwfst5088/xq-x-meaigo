@@ -1661,6 +1661,7 @@ D('blackName').textContent=myCl==='black'?'你（黑方）':'对手（黑方）'
 D('drawBtn').style.display='inline-flex';
 boardFlip=(myCl==='black');
 var isPageReload=window._isPageReload;window._isPageReload=false;
+if(window._rvSavedEngine)return;
 if(d.moveHistory&&d.moveHistory.length>0){window._xqGhostGuard=false;}
 if(window._xqGhostGuard&&d.moveHistory&&d.moveHistory.length===0&&engine.moveHistory.length>0){try{toast('房间已解散，保留本地复盘棋局',2000);}catch(e){}return;}
 // 本地领先保护：本地恰好比服务端多1步且正是 pendingMove（未确认走棋）时，
@@ -6700,6 +6701,7 @@ setTimeout(function(){step(i+1);},10);
 }
 function finish(){
 window._rvPlies=plies;
+try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:plies,idx:0}));}catch(e){}
 computeDrops(plies);
 drawCurve(plies);
 var st=$id('rvStatus');if(st)st.textContent='✅ 复盘完成 · 用下方按钮逐着回放';
@@ -6756,10 +6758,27 @@ ctx.beginPath();ctx.arc(X(i),Y(mover==='red'?wi:100-wi),4,0,Math.PI*2);ctx.fill(
 }
 }
 }
-window.showRvPly=function(i){
+window._xqResumeReview=function(){
+try{
+var raw=sessionStorage.getItem('xq_review');if(!raw)return;
+var d=JSON.parse(raw);if(!d||!d.snap||!d.plies||!d.plies.length)return;
+if($id('rvPanel'))return;
+window._rvSnap=d.snap;window._rvPlies=d.plies;window._rvIdx=(d.idx!=null)?d.idx:0;window._rvSavedEngine=engine;
+var pnl=document.createElement('div');pnl.id='rvPanel';
+pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">📋 AI复盘</span></div>'
++'<div id="rvStatus" style="font-size:12px;color:#4caf50;margin:4px 0">✅ 复盘已恢复</div>'
++'<canvas id="rvCurve" width="460" height="110" style="width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
++'<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:18px"></div>'
++'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
+var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}
+try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}
+computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);
+}catch(e){}
+};window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
 if(i<0)i=0;if(i>plies.length-1)i=plies.length-1;
 window._rvIdx=i;
+try{var _rv=sessionStorage.getItem('xq_review');if(_rv){var _r2=JSON.parse(_rv);_r2.idx=i;sessionStorage.setItem('xq_review',JSON.stringify(_r2));}}catch(e){}
 var rev=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
 rev.gameOver=true;
 if(!window._rvSavedEngine)window._rvSavedEngine=engine;
@@ -6785,6 +6804,7 @@ if(i>plies.length-1){toast('已经是最后一步');return;}
 showRvPly(i);
 };
 window.closeReview=function(){
+try{sessionStorage.removeItem('xq_review');}catch(e){}
 window._rvPlies=null;window._rvIdx=-1;
 var pnl=$id('rvPanel');if(pnl)pnl.remove();try{document.body.classList.remove('rv-open');updateBoardSize();}catch(e){}
 if(window._rvSavedEngine){engine=window._rvSavedEngine;window._rvSavedEngine=null;}
@@ -6792,6 +6812,7 @@ lastMove=null;selected=null;validMoves=[];
 drawBoardBg();render();
 if(typeof D==='function'&&D('turnText')&&typeof engine!=='undefined'&&engine){D('turnText').textContent=engine.winner?(engine.winner==='draw'?'和棋':(engine.winner==='red'?'红方胜':'黑方胜')):'红方走棋';}
 };
+setTimeout(function(){try{if(sessionStorage.getItem('xq_review')&&typeof engine!=='undefined'){window._xqResumeReview();}}catch(e){}},1200);
 })();
 </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"0a4ff2af697e451c85fdf620787d507c","r":1}' crossorigin="anonymous"></script>
