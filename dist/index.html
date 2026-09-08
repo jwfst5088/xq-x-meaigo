@@ -177,7 +177,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 .rv-close{background:transparent;border:none;color:#8b7355;font-size:13px;cursor:pointer;padding:2px 6px;font-family:inherit}
 .rv-close:hover{color:#d4a843}
 @media(min-width:1000px){#rvPanel{right:16px;top:60px;width:340px}}
-@media(max-width:999px){#rvPanel{left:50%;transform:translateX(-50%);bottom:12px}}
+@media(max-width:999px){#rvPanel{left:50%;transform:translateX(-50%);bottom:12px;max-height:42vh;overflow-y:auto}body.rv-open #game{padding-bottom:40vh}}
 @media(min-width:1000px){
 .lb-body{flex-direction:row;align-items:flex-start;max-width:1240px;margin:0 auto;gap:24px;padding:0 20px;box-sizing:border-box}
 .lb-main{padding-top:46px}
@@ -6658,13 +6658,12 @@ hideOverlay();
 var old=$id('rvPanel');if(old)old.remove();
 var pnl=document.createElement('div');
 pnl.id='rvPanel';
-pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">📋 AI复盘</span><button class="rv-close" onclick="closeReview()" title="关闭复盘">✕ 关闭</button></div>'
+pnl.innerHTML='<div class="rv-head"><span style="color:#d4a843;font-weight:800">📋 AI复盘</span></div>'
 +'<div id="rvStatus" style="font-size:12px;color:#d4a843;margin:4px 0">引擎准备中…</div>'
 +'<canvas id="rvCurve" width="460" height="110" style="width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
 +'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
-document.body.appendChild(pnl);
-runAnalysis(snap);
+document.body.appendChild(pnl);try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
 var total=snap.moves.length;
@@ -6777,7 +6776,7 @@ showRvPly(i);
 };
 window.closeReview=function(){
 window._rvPlies=null;window._rvIdx=-1;
-var pnl=$id('rvPanel');if(pnl)pnl.remove();
+var pnl=$id('rvPanel');if(pnl)pnl.remove();try{document.body.classList.remove('rv-open');updateBoardSize();}catch(e){}
 if(window._rvSavedEngine){engine=window._rvSavedEngine;window._rvSavedEngine=null;}
 lastMove=null;selected=null;validMoves=[];
 drawBoardBg();render();
