@@ -1310,9 +1310,9 @@ if(engine.winner===aiCl)recordGameResult('aiWin');
 else if(engine.winner===myCl)recordGameResult('aiLose');
 else if(engine.winner==='draw')recordGameResult('draw');
 if(engine.winner===myCl){
-showOverlay('<h2>🎉 你赢了!</h2><p>恭喜战胜Pikafish!</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryPikafishGame()">再来一局</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
+showOverlay('<h2>🎉 你赢了!</h2><p>恭喜战胜高级AI!</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryPikafishGame()">再来一局</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
 }else if(engine.winner===aiCl){
-showOverlay('<h2>💪 再接再厉</h2><p>Pikafish获胜，请重新挑战</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryPikafishGame()">再来一局</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
+showOverlay('<h2>💪 再接再厉</h2><p>高级AI获胜，请重新挑战</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryPikafishGame()">再来一局</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
 }else{
 showOverlay('<h2>🤝 和棋</h2><p>双方握手言和</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryPikafishGame()">再来一局</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
 }
@@ -6063,9 +6063,9 @@ function startPikafishGame(userColor){
 	gm = 'pikafish'; myCl = userColor; myRm = null; boardFlip = (userColor === 'black');
 	aiCl = (userColor === 'red') ? 'black' : 'red';
 	D('drawBtn').style.display = 'none';
-	D('redName').textContent = (userColor === 'red') ? _xqMyName()+'（红方）' : 'Pikafish（红方）';
-	D('blackName').textContent = (userColor === 'black') ? _xqMyName()+'（黑方）' : 'Pikafish（黑方）';
-	D('modeBadge').textContent = 'Pikafish 深度AI';
+	D('redName').textContent = (userColor === 'red') ? _xqMyName()+'（红方）' : '高级AI（红方）';
+	D('blackName').textContent = (userColor === 'black') ? _xqMyName()+'（黑方）' : '高级AI（黑方）';
+	D('modeBadge').textContent = '人机对弈高级';
 	engine.initBoard(); engine.currentTurn = 'red'; engine.gameOver = false; engine.winner = null; engine.moveHistory = [];
 	capRed = []; capBlk = []; lastMove = null; selected = null; validMoves = []; gameStarted = true; clickCount = 0;
 	checkStreak = 0; lastCheckColor = null;
@@ -6081,7 +6081,7 @@ async function pikafishDeepThink(){
 		return;
 	}
 	aiThinking = true;
-	D('turnText').textContent = 'Pikafish 深度思考中...';
+	D('turnText').textContent = '高级AI 深度思考中...';
 	console.log('=== Pikafish Deep AI thinking (depth 15) ===');
 
 	try {
@@ -6112,7 +6112,7 @@ async function pikafishDeepThink(){
 				return;
 			}
 		}
-		console.log('Pikafish 返回空着法，回退到本地AI');
+		console.log('高级AI 返回空着法，回退到本地AI');
 	} catch(e) {
 		console.error('Pikafish deep engine error:', e);
 	}
@@ -6133,9 +6133,9 @@ function retryPikafishGame(){
 	gm = 'pikafish';
 	var uc = Math.random() < 0.5 ? 'red' : 'black';
 	myCl = uc; boardFlip = (uc === 'black'); aiCl = (uc === 'red') ? 'black' : 'red';
-	D('redName').textContent = (uc === 'red') ? _xqMyName()+'（红方）' : 'Pikafish（红方）';
-	D('blackName').textContent = (uc === 'black') ? _xqMyName()+'（黑方）' : 'Pikafish（黑方）';
-	D('modeBadge').textContent = 'Pikafish 深度AI';
+	D('redName').textContent = (uc === 'red') ? _xqMyName()+'（红方）' : '高级AI（红方）';
+	D('blackName').textContent = (uc === 'black') ? _xqMyName()+'（黑方）' : '高级AI（黑方）';
+	D('modeBadge').textContent = '人机对弈高级';
 	engine.initBoard(); engine.currentTurn = 'red'; engine.gameOver = false; engine.winner = null; engine.moveHistory = [];
 	capRed = []; capBlk = []; lastMove = null; selected = null; validMoves = []; gameStarted = true; clickCount = 0; checkStreak = 0; lastCheckColor = null;
 	D('turnText').textContent = '红方走棋';
@@ -6222,7 +6222,7 @@ try{var s=localStorage.getItem('xq_game');if(s){var g=JSON.parse(s);
 if(g.gm==='ai'||g.gm==='pikafish'){
 gm=g.gm;myCl=g.myCl||'red';aiCl=g.aiCl||'black';boardFlip=(myCl==='black');soundEnabled=true;gameOverSoundPlayed=false;
 D('lobby').classList.add('hide');D('game').classList.add('show');
-D('modeBadge').textContent=(g.gm==='pikafish')?'Pikafish深度AI':'人机对弈';
+D('modeBadge').textContent=(g.gm==='pikafish')?'人机对弈高级':'人机对弈';
 D('drawBtn').style.display='none';
 D('redName').textContent=(myCl==='red')?_xqMyName()+'（红方）':'AI（红方）';
 D('blackName').textContent=(myCl==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
