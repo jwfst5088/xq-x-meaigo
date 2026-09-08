@@ -71,8 +71,9 @@ function tierDelta(myScore, oppScore, outcome) {
   else if (d < -1) d = -1;
   const win = outcome === 1;
   if (d === 0) return win ? 10 : -10;
-  if (d > 0) return win ? 15 : -5;
-  return win ? 5 : -15;
+  // 对手比你低1小段（你的小段更高）：胜+5 负-15；对手比你高1小段：胜+15 负-5
+  if (d > 0) return win ? 5 : -15;
+  return win ? 15 : -5;
 }
 __name(tierDelta, "tierDelta");
 async function ensureRatingTables(db) {
