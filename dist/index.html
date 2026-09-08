@@ -6675,8 +6675,8 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvStatus" style="display:none;font-size:12px;color:#d4a843;margin:4px 0">引擎准备中…</div>'
 +'<canvas id="rvCurve" width="460" height="110" style="display:none;width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
-+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
-var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}runAnalysis(snap);
++'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
+var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){_rw.style.height=((_rw.clientWidth||300)*10/9)+'px';}window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
 var total=snap.moves.length;
@@ -6771,24 +6771,51 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvStatus" style="display:none;font-size:12px;color:#4caf50;margin:4px 0">✅ 复盘已恢复</div>'
 +'<canvas id="rvCurve" width="460" height="110" style="display:none;width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px"></div>'
-+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
++'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
 var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}
-try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();}catch(e){}
+try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){_rw.style.height=((_rw.clientWidth||300)*10/9)+'px';}window._xqRenderRvBoard();}catch(e){}
 try{if(d.plies&&d.plies.length){computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);}else{var st0=$id('rvStatus');if(st0)st0.textContent='分析中…';runAnalysis(d.snap);}}catch(e2){}
+}catch(e){}
+};window._xqRenderRvBoard=function(){
+try{
+var el=$id('rvBoard');if(!el)return;
+var w=el.clientWidth||el.parentNode.clientWidth||300;if(w<=0)w=300;
+var ps=w*0.04,rcs=(w-ps*2)/8,fl=(typeof boardFlip!=='undefined'&&boardFlip);
+var cv=$id('rvBg');if(cv){
+var hh=w*10/9;el.style.height=hh+'px';
+var dpr=window.devicePixelRatio||1;cv.width=w*dpr;cv.height=hh*dpr;cv.style.width=w+'px';cv.style.height=hh+'px';
+var ctx=cv.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.scale(dpr,dpr);
+var bw=w-ps*2,bh=hh-ps*2;
+var wood=ctx.createLinearGradient(0,ps,0,ps+bh);wood.addColorStop(0,'#c28e56');wood.addColorStop(0.5,'#e8c99a');wood.addColorStop(1,'#e0b383');
+ctx.fillStyle='#d4a56a';ctx.fillRect(ps-rcs*0.1,ps-rcs*0.1,bw+rcs*0.2,bh+rcs*0.2);
+ctx.fillStyle=wood;ctx.fillRect(ps,ps,bw,bh);
+ctx.strokeStyle='#9c7550';ctx.lineWidth=1.2;
+for(var r=0;r<10;r++){var y=ps+r*(bh/9);ctx.beginPath();ctx.moveTo(ps,y);ctx.lineTo(ps+bw,y);ctx.stroke();}
+for(var c=0;c<9;c++){if(c===0||c===8){var x2=ps+c*(bw/8);ctx.beginPath();ctx.moveTo(x2,ps);ctx.lineTo(x2,ps+bh);ctx.stroke();}else{var x3=ps+c*(bw/8);ctx.beginPath();ctx.moveTo(x3,ps);ctx.lineTo(x3,ps+4*(bh/9));ctx.stroke();ctx.beginPath();ctx.moveTo(x3,ps+5*(bh/9));ctx.lineTo(x3,ps+bh);ctx.stroke();}}
+ctx.beginPath();ctx.moveTo(ps,ps+4*(bh/9));ctx.lineTo(ps+3*(bw/8),ps);ctx.moveTo(ps+5*(bw/8),ps);ctx.lineTo(ps+bw,ps+4*(bh/9));ctx.moveTo(ps,ps+5*(bh/9));ctx.lineTo(ps+3*(bw/8),ps+bh);ctx.moveTo(ps+5*(bw/8),ps+5*(bh/9));ctx.lineTo(ps+bw,ps+bh);ctx.stroke();
+}
+el.querySelectorAll('.piece').forEach(function(e){e.remove();});
+var rev=window._rvEngine;if(!rev)return;
+var lm=window._rvLastMove;
+for(var r2=0;r2<10;r2++)for(var c2=0;c2<9;c2++){var p=rev.board[r2][c2];if(!p)continue;
+var rr=fl?9-r2:r2;var x=ps+c2*rcs,y=ps+rr*rcs;
+var d=document.createElement('div');
+d.className='piece '+(p.color==='red'?'red-p':'blk-p')+(lm&&lm.row===r2&&lm.col===c2?' last-move':'');
+d.style.width=(rcs*0.86)+'px';d.style.height=(rcs*0.86)+'px';d.style.fontSize=(rcs*0.45)+'px';d.style.lineHeight=(rcs*0.86)+'px';d.style.left=x+'px';d.style.top=y+'px';
+d.textContent=PN[p.type][p.color];
+el.appendChild(d);}
 }catch(e){}
 };window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
 if(i<0)i=0;if(i>plies.length-1)i=plies.length-1;
 window._rvIdx=i;
 try{var _rv=sessionStorage.getItem('xq_review');if(_rv){var _r2=JSON.parse(_rv);_r2.idx=i;sessionStorage.setItem('xq_review',JSON.stringify(_r2));}}catch(e){}
-var rev=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
-rev.gameOver=true;
-if(!window._rvSavedEngine)window._rvSavedEngine=engine;
-engine=rev;
-var m=snap.moves[i];
-lastMove={row:m.toRow,col:m.toCol};
-selected=null;validMoves=[];
-drawBoardBg();render();
+window._rvEngine=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
+ window._rvEngine.gameOver=true;
+ if(!window._rvSavedEngine)window._rvSavedEngine=engine;
+ var m=snap.moves[i];
+ window._rvLastMove={row:m.toRow,col:m.toCol};
+ window._xqRenderRvBoard();
 if(typeof D==='function'&&D('turnText'))D('turnText').textContent='📋 复盘 · 第'+(i+1)+'手';
 var p=plies[i];var d=$id('rvDetail');if(!d)return;
 var w=p?scoreToRedWin(p.score,p.turn):null;
