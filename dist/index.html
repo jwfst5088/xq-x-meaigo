@@ -1628,9 +1628,9 @@ socket.on('player_disconnected',function(d){
 		hideOverlay();
 		try{
 			if(engine.gameOver)return;
-			var tt=D('turnText');if(tt)tt.textContent='对手断线，12秒后判你获胜';
+			var tt=D('turnText');if(tt)tt.textContent='对手断线，20秒后判你获胜';
 			if(window._dcTimer)clearInterval(window._dcTimer);
-			var _dc=12;
+			var _dc=20;
 			window._dcTimer=setInterval(function(){
 				_dc--;
 				if(_dc<=0){clearInterval(window._dcTimer);window._dcTimer=null;return;}
@@ -6437,7 +6437,7 @@ if(!d||window._autoLobbyDone)return;
 if(d.reason==='opponent_left'||d.reason==='disconnect_timeout'){
 window._autoLobbyDone=true;
 if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
-var _n=12;
+var _n=20;
 var _txt=d.reason==='opponent_left'?'对手已退出对局':'对手断线超时';
 showOverlay('<h2>🏆 '+_txt+'</h2><p>你获得本局胜利，棋力分已结算。</p><p style="font-size:18px;color:#d4a843"><b id="_autoLobbyN">'+_n+'</b> 秒后自动返回大厅</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="hideOverlay();doLeaveGame()">立即返回大厅</button></div>');
 window._dcTimer=setInterval(function(){
