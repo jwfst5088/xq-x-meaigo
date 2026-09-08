@@ -7,6 +7,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChessRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["MatchQueue"]
     }
   ],
   "assets": {
@@ -18,6 +22,10 @@
       {
         "name": "CHESS_ROOM",
         "class_name": "ChessRoom"
+      },
+      {
+        "name": "MATCH_QUEUE",
+        "class_name": "MatchQueue"
       }
     ]
   },

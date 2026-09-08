@@ -158,6 +158,21 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()">
 <button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入</button>
 </div>
+<div id="matchBox" style="margin-top:10px">
+<button id="matchBtn" class="btn btn-orange" style="background:#e67e22;border-color:#d35400;color:#fff;font-weight:700" onclick="quickMatch()">⚡ 快速匹配</button>
+<div id="matchHint" style="font-size:11px;color:#8b7355;margin-top:4px">按等级分自动配对手工房间</div>
+</div>
+<div id="profileBox" style="background:#1a0f0a;border-radius:8px;padding:8px 12px;margin:10px 0 0 0;border:1px solid #3d2117;text-align:left;display:none">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span style="font-size:13px;color:#d4a843;font-weight:700">👤 <span id="pfName">游客</span> <span id="pfTitle" style="font-size:11px;color:#8b7355"></span></span>
+<button class="btn btn-outline" style="width:auto;padding:2px 8px;font-size:11px" onclick="editPlayerName()">改名</button>
+</div>
+<div style="font-size:12px;color:#8b7355;margin-top:2px">Elo <b style="color:#2ecc71" id="pfElo">1200</b> · <span id="pfRecord">0胜 0和 0负</span></div>
+</div>
+<div id="lbBox" style="margin-top:10px">
+<button id="lbToggle" class="btn btn-outline" style="width:auto;padding:6px 14px;font-size:13px" onclick="toggleLeaderboard()">🏆 排行榜</button>
+<div id="lbList" style="display:none;background:#1a0f0a;border-radius:8px;padding:8px 10px;margin-top:6px;border:1px solid #3d2117;text-align:left;max-height:260px;overflow-y:auto;font-size:12px"></div>
+</div>
 </div>
 <div class="status" id="lobbyStatus"></div>
 <div class="online-count" id="onlineCount">当前在线: - 人</div>
@@ -1425,9 +1440,9 @@ var isPageReload=!!window._pendingReconnect;
 if(window._pendingRoomAction&&socket.roomId){var pa=window._pendingRoomAction;window._pendingRoomAction=null;
  if(pa.action==='reconnect'){socket.emit('reconnect_room',{roomId:pa.roomId,color:pa.color});}
  else if(pa.action==='create'){socket.emit('create_room',{roomId:pa.roomId,lastColor:pa.lastColor||null});}
- else{socket.emit(pa.action+'_room',pa.roomId);}
+ else{socket.emit(pa.action+'_room',Object.assign({roomId:pa.roomId},window._xqIdentityFields?window._xqIdentityFields():{}));}
 }
-else if(window._pendingReconnect){var pr=window._pendingReconnect;if(pr.redLeft!==undefined){redLeft=pr.redLeft;blkLeft=pr.blkLeft;}window._pendingReconnect=null;socket.emit('reconnect_room',{roomId:pr.myRm,color:pr.myCl});}
+else if(window._pendingReconnect){var pr=window._pendingReconnect;if(pr.redLeft!==undefined){redLeft=pr.redLeft;blkLeft=pr.blkLeft;}window._pendingReconnect=null;socket.emit('reconnect_room',Object.assign({roomId:pr.myRm,color:pr.myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
 else if(gm==='online'&&myRm){socket.emit('reconnect_room',{roomId:myRm,color:myCl});}
 window._isPageReload=isPageReload;
 });
@@ -1491,7 +1506,7 @@ render();
 }
 }
 // 拉取服务端全量状态，确保两端一致（防分叉）
-if(gm==='online'&&myRm&&sockOk){socket.emit('reconnect_room',{roomId:myRm,color:myCl});}
+if(gm==='online'&&myRm&&sockOk){socket.emit('reconnect_room',Object.assign({roomId:myRm,color:myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
 toast((d&&d.reason==='not_your_turn')?'状态已同步，请重新走棋':'走棋未生效，已同步状态',1800);
 saveGameState();
 });
@@ -6186,6 +6201,319 @@ window.addEventListener('load', function(){
 });
 
 connectSocket();
+</script>
+<script>
+// ========== P1 商业化: 等级分身份 + 快速匹配 + 排行榜 + AI复盘 ==========
+(function(){
+'use strict';
+function $id(x){return document.getElementById(x);}
+function api(path,opts){opts=opts||{};opts.headers=Object.assign({'Content-Type':'application/json'},opts.headers||{});return fetch(path,opts).then(function(r){return r.json();});}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// ---------- 设备身份 ----------
+var DEV_KEY='xq_device_id',NAME_KEY='xq_player_name';
+function getDev(){var d=null;try{d=localStorage.getItem(DEV_KEY);}catch(e){}
+if(!d||d.length<3){d='D'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem(DEV_KEY,d);}catch(e){}}
+return d;}
+function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return null;}}
+window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||null,elo:(p&&p.elo)?p.elo:1200};};
+function renderProfile(p){
+var box=$id('profileBox');if(!box||!p)return;
+$id('pfName').textContent=p.name||('棋手'+p.deviceId.slice(-4));
+$id('pfTitle').textContent=p.title||'';
+$id('pfElo').textContent=p.elo;
+$id('pfRecord').textContent=(p.wins||0)+'胜 '+(p.draws||0)+'和 '+(p.losses||0)+'负';
+box.style.display='';
+}
+window.editPlayerName=function(){
+var n=prompt('输入昵称（最多12字）',getName()||'');if(n===null)return;
+n=(n||'').trim().slice(0,12);if(!n)return;
+try{localStorage.setItem(NAME_KEY,n);}catch(e){}
+registerProfile();
+toast('昵称已更新: '+n,1500);
+};
+function registerProfile(){
+api('/api/player/register',{method:'POST',body:JSON.stringify({deviceId:getDev(),name:getName()||null})})
+.then(function(r){if(r&&r.player){window._xqProfile=r.player;renderProfile(r.player);}}).catch(function(){});
+}
+registerProfile();
+
+// ---------- 等级分变更提示 ----------
+function attachRatingHandler(){
+if(typeof socket!=='undefined'&&socket){
+try{socket.on('rating_update',function(d){window._xqOnRatingUpdate(d);});}catch(e){}
+}
+}
+window._xqOnRatingUpdate=function(d){
+try{
+api('/api/player/profile?deviceId='+encodeURIComponent(getDev())).then(function(r){
+if(r&&r.player){var prev=window._xqProfile;window._xqProfile=r.player;renderProfile(r.player);
+if(prev&&prev.elo!==r.player.elo){var diff=r.player.elo-prev.elo;toast((diff>=0?'📈 等级分 +':'📉 等级分 ')+diff+' → '+r.player.elo+'（'+(r.player.title||'')+'）',2800);}}
+}).catch(function(){});
+}catch(e){}
+};
+attachRatingHandler();
+if(typeof connectSocket==='function'){
+var _origConnectSocket=connectSocket;
+window.connectSocket=function(){_origConnectSocket();setTimeout(attachRatingHandler,0);};
+}
+
+// ---------- 排行榜 ----------
+window.toggleLeaderboard=function(){
+var lst=$id('lbList');if(!lst)return;
+if(lst.style.display==='none'){lst.style.display='';$id('lbToggle').textContent='🏆 收起排行榜';loadLeaderboard();}
+else{lst.style.display='none';$id('lbToggle').textContent='🏆 排行榜';}
+};
+function loadLeaderboard(){
+var lst=$id('lbList');if(!lst)return;
+lst.innerHTML='<div style="color:#8b7355;padding:4px">加载中...</div>';
+api('/api/leaderboard').then(function(r){
+if(!r||!r.ok||!r.list||!r.list.length){lst.innerHTML='<div style="color:#8b7355;padding:6px">暂无数据，来一局在线对战上榜吧！</div>';return;}
+var h='<table style="width:100%;border-collapse:collapse">';
+h+='<tr style="color:#d4a843"><td style="padding:2px">#</td><td>棋手</td><td>段位</td><td>Elo</td><td>战绩</td></tr>';
+r.list.forEach(function(p){
+var medal=p.rank===1?'🥇':p.rank===2?'🥈':p.rank===3?'🥉':p.rank;
+h+='<tr style="border-top:1px solid #3d2117"><td style="padding:3px 2px">'+medal+'</td><td>'+esc(p.name)+'</td><td style="color:#8b7355;font-size:11px">'+p.title+'</td><td style="color:#2ecc71;font-weight:700">'+p.elo+'</td><td style="color:#8b7355;font-size:11px">'+p.wins+'胜'+p.losses+'负'+(p.draws?'+'+p.draws:'')+'</td></tr>';
+});
+h+='</table>';
+lst.innerHTML=h;
+}).catch(function(){lst.innerHTML='<div style="color:#8b7355">加载失败</div>';});
+}
+
+// ---------- 快速匹配 ----------
+var _matching=false,_matchTicket=null,_matchTimer=null,_matchStarted=0;
+window.quickMatch=function(){
+if(_matching){cancelMatch();toast('已取消匹配');return;}
+if(typeof sockOk==='undefined'||!sockOk){toast('服务器未连接，请稍候再试');return;}
+if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){toast('已在对局中');return;}
+_matching=true;_matchStarted=Date.now();
+api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())}).then(function(r){
+if(!r||!r.ok){_matching=false;resetMatchBtn();toast(r&&r.error?r.error:'匹配服务不可用');return;}
+_matchTicket=r.ticket;
+var btn=$id('matchBtn');
+if(btn){btn.textContent='⏳ 匹配中… (点击取消)';btn.style.background='#c0392b';btn.style.borderColor='#a93226';}
+pollMatch();
+}).catch(function(){_matching=false;resetMatchBtn();toast('匹配服务不可用');});
+};
+function pollMatch(){
+if(!_matching||!_matchTicket)return;
+api('/api/match/status?ticket='+encodeURIComponent(_matchTicket)).then(function(r){
+if(!_matching)return;
+if(r&&r.state==='paired'){_matching=false;_matchTicket=null;resetMatchBtn();toast('🎯 已匹配对手，进入对局!',2000);enterMatchRoom(r.roomId);return;}
+if(Date.now()-_matchStarted>60000){cancelMatch();toast('匹配超时，试试创建房间或人机对弈',2800);return;}
+_matchTimer=setTimeout(pollMatch,2000);
+}).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
+}
+function cancelMatch(){
+_matching=false;
+if(_matchTicket){api('/api/match/cancel',{method:'POST',body:JSON.stringify({ticket:_matchTicket})}).catch(function(){});_matchTicket=null;}
+if(_matchTimer){clearTimeout(_matchTimer);_matchTimer=null;}
+resetMatchBtn();
+}
+function resetMatchBtn(){
+var btn=$id('matchBtn');
+if(btn){btn.textContent='⚡ 快速匹配';btn.style.background='#e67e22';btn.style.borderColor='#d35400';}
+}
+function enterMatchRoom(roomId){
+try{localStorage.setItem('xq_last_color','');}catch(e){}
+if(typeof socket!=='undefined'&&socket&&typeof socket.reconnectToRoom==='function'){
+window._pendingRoomAction=Object.assign({roomId:roomId,action:'join'},window._xqIdentityFields());
+socket.reconnectToRoom(roomId);
+}
+}
+window.addEventListener('beforeunload',function(){if(_matching)cancelMatch();});
+
+// ---------- 带身份的创建/加入 ----------
+if(typeof createRoom==='function'){
+window.createRoom=function(){
+if(typeof sockOk==='undefined'||!sockOk){var s=$id('lobbyStatus');if(s)s.textContent='服务器未连接，请稍候再试';return;}
+var ci=$id('createInput');
+var customId=ci?ci.value.trim().toUpperCase():'';
+var lastColor=null;try{lastColor=localStorage.getItem('xq_last_color');}catch(e){}
+var s2=$id('lobbyStatus');if(s2)s2.textContent='正在创建房间...';
+socket.emit('create_room',Object.assign({roomId:customId||null,lastColor:lastColor},window._xqIdentityFields()));
+};
+window.joinRoom=function(){
+if(typeof sockOk==='undefined'||!sockOk){var s=$id('lobbyStatus');if(s)s.textContent='服务器未连接，请稍候再试';return;}
+var ri=$id('roomInput');
+var rm=ri?ri.value.trim().toUpperCase():'';
+if(!rm){var s3=$id('lobbyStatus');if(s3)s3.textContent='请输入房间号';return;}
+var s4=$id('lobbyStatus');if(s4)s4.textContent='正在加入房间...';
+socket.emit('join_room',Object.assign({roomId:rm},window._xqIdentityFields()));
+};
+}
+
+// ---------- AI复盘 ----------
+window._reviewSnapshot=null;
+if(typeof showGameOver==='function'){
+var _origSGO=showGameOver;
+window.showGameOver=function(wt){
+try{
+var ok=(typeof gm!=='undefined')&&(gm==='online'||gm==='ai'||gm==='pikafish'||gm==='local');
+var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];
+window._reviewSnapshot=(ok&&mv.length>=4)?{moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine)?engine.winner:null,gm:gm}:null;
+}catch(e){window._reviewSnapshot=null;}
+_origSGO(wt);
+try{
+if(window._reviewSnapshot){
+var ob=$id('overlayBox');
+if(ob&&!$id('btnReview')){
+var b=document.createElement('button');
+b.id='btnReview';b.className='btn btn-outline';
+b.style.cssText='width:auto;padding:10px 20px;font-size:14px;background:#8e44ad;color:#fff;border-color:#7d3c98';
+b.textContent='📋 AI复盘';
+b.onclick=function(){openReview();};
+var btns=ob.querySelector('.btns2');
+if(btns)btns.appendChild(b);else ob.appendChild(b);
+}
+}
+}catch(e){}
+};
+}
+window.openReview=function(){
+var snap=window._reviewSnapshot;
+if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
+window._rvSnap=snap;window._rvPlies=null;
+var html='<h2>📋 AI复盘</h2>';
+html+='<div id="rvStatus" style="font-size:13px;color:#d4a843;margin:6px 0">引擎准备中…</div>';
+html+='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:820px">';
+html+='<div><canvas id="rvCurve" width="500" height="140" style="width:500px;max-width:96vw;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>';
+html+='<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:20px">分析完成后点击棋谱查看局面</div>';
+html+='<canvas id="rvBoard" width="270" height="300" style="width:270px;max-width:60vw;background:#f0d9b5;border-radius:4px"></canvas></div>';
+html+='<div id="rvList" style="max-width:280px;max-height:440px;overflow-y:auto;font-size:12px;text-align:left;line-height:2;min-width:240px"></div>';
+html+='</div>';
+html+='<div class="btns2" style="margin-top:8px"><button class="btn btn-outline" style="width:auto;padding:8px 16px" onclick="hideOverlay()">关闭</button></div>';
+showOverlay(html);
+runAnalysis(snap);
+};
+function runAnalysis(snap){
+var total=snap.moves.length;
+var pfEngine=null;
+var fail=function(m){var st=$id('rvStatus');if(st)st.textContent='❌ '+m;};
+if(typeof getPikafishEngine!=='function'){fail('引擎不可用');return;}
+getPikafishEngine().then(function(pf){pfEngine=pf;step(0);}).catch(function(e){fail(e.message||'引擎加载失败');});
+var plies=[];
+function step(i){
+if(!$id('rvCurve'))return;
+if(i>=total){finish();return;}
+var st=$id('rvStatus');if(st)st.textContent='分析中 '+(i+1)+'/'+total+'…（浅层快速分析）';
+var m=snap.moves[i];
+var rev=buildEngineToPly(i,snap.moves);
+var turn=rev.currentTurn;
+var fen=pfEngine.boardToFen(rev.board,turn);
+pfEngine.analyzeFen(fen,420).then(function(r){
+plies.push({turn:turn,score:r?r.score:null,best:r?r.move:null,played:{fr:m.fromRow,fc:m.fromCol,tr:m.toRow,tc:m.toCol}});
+setTimeout(function(){step(i+1);},10);
+}).catch(function(){
+plies.push({turn:turn,score:null,best:null,played:{fr:m.fromRow,fc:m.fromCol,tr:m.toRow,tc:m.toCol}});
+setTimeout(function(){step(i+1);},10);
+});
+}
+function finish(){
+window._rvPlies=plies;
+computeDrops(plies);
+drawCurve(plies);
+buildMoveList(plies,snap);
+var st=$id('rvStatus');if(st)st.textContent='✅ 复盘完成 · 点击右侧棋谱查看局面与评估';
+if(plies.length){var rev2=buildEngineToPly(1,snap.moves);drawMiniBoard(rev2);}
+}
+}
+function buildEngineToPly(n,moves){
+var rev=new CE();rev.initBoard();
+for(var i=0;i<n&&i<moves.length;i++){var m=moves[i];try{rev.move(m.fromRow,m.fromCol,m.toRow,m.toCol);}catch(e){}}
+return rev;
+}
+function scoreToRedWin(sc,turn){
+if(!sc)return null;
+if(sc.type==='mate'){return turn==='red'?(sc.value>0?100:0):(sc.value>0?0:100);}
+var cp=sc.value*(turn==='red'?1:-1);
+return 100/(1+Math.exp(-cp/300));
+}
+function computeDrops(plies){
+for(var i=0;i<plies.length-1;i++){
+var wi=scoreToRedWin(plies[i].score,plies[i].turn);
+var wn=scoreToRedWin(plies[i+1].score,plies[i+1].turn);
+if(wi==null||wn==null)continue;
+var mover=plies[i].turn;
+var wBefore=mover==='red'?wi:100-wi;
+var wAfter=mover==='red'?100-wn:wn;
+plies[i].drop=wBefore-wAfter;
+}
+}
+function drawCurve(plies){
+var cv=$id('rvCurve');if(!cv)return;var ctx=cv.getContext('2d');
+var W=cv.width,H=cv.height;
+ctx.clearRect(0,0,W,H);
+ctx.fillStyle='#120a06';ctx.fillRect(0,0,W,H);
+var n=plies.length;if(n<2)return;
+var pad=8;
+function X(i){return pad+(W-2*pad)*i/(n-1);}
+function Y(w){return pad+(H-2*pad)*(1-w/100);}
+ctx.strokeStyle='#3d2117';ctx.lineWidth=1;
+ctx.beginPath();ctx.moveTo(pad,Y(50));ctx.lineTo(W-pad,Y(50));ctx.stroke();
+ctx.fillStyle='#8b7355';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
+ctx.fillText('红优↑',4,2);ctx.fillText('黑优↓',4,H-12);
+ctx.beginPath();var started=false;
+for(var i=0;i<n;i++){var w=scoreToRedWin(plies[i].score,plies[i].turn);if(w==null)continue;var x=X(i),y=Y(w);if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);}
+ctx.strokeStyle='#2ecc71';ctx.lineWidth=2;ctx.stroke();
+for(var i=0;i<n;i++){
+var d=plies[i].drop;
+if(d!==undefined&&d>=25){
+var wi=scoreToRedWin(plies[i].score,plies[i].turn);
+if(wi==null)continue;
+var mover=plies[i].turn;
+ctx.fillStyle=d>=45?'#e74c3c':'#f39c12';
+ctx.beginPath();ctx.arc(X(i),Y(mover==='red'?wi:100-wi),4,0,Math.PI*2);ctx.fill();
+}
+}
+}
+function buildMoveList(plies,snap){
+var lst=$id('rvList');if(!lst)return;
+var h='';
+for(var i=0;i<plies.length;i++){
+var p=plies[i];
+var m=p.played;
+var pieceChar='';
+try{var pc=snap.moves[i].piece;pieceChar=(typeof PN!=='undefined'&&PN[pc.type]&&PN[pc.type][pc.color])?PN[pc.type][pc.color]:'';}catch(e){}
+var w=p.score?scoreToRedWin(p.score,p.turn):null;
+var wTxt=w==null?'-':Math.round(w)+'%';
+var mark=(p.drop!==undefined&&p.drop>=45)?' <span style="color:#e74c3c;font-weight:700">??</span>':(p.drop!==undefined&&p.drop>=25)?' <span style="color:#f39c12;font-weight:700">?</span>':'';
+h+='<div style="cursor:pointer;padding:0 4px;border-radius:4px" onmouseover="this.style.background=\'#2a1810\'" onmouseout="this.style.background=\'\'" onclick="showRvPly('+i+')">';
+h+='<span style="color:#8b7355">'+(i+1)+'.</span> <span style="color:'+(p.turn==='red'?'#e74c3c':'#aaa')+'">'+(p.turn==='red'?'红':'黑')+' '+pieceChar+'</span> ('+m.fr+','+m.fc+')→('+m.tr+','+m.tc+') <span style="color:#2ecc71">'+wTxt+'</span>'+mark+'</div>';
+}
+lst.innerHTML=h;
+}
+function drawMiniBoard(rev){
+var cv=$id('rvBoard');if(!cv)return;var ctx=cv.getContext('2d');
+var W=cv.width,H=cv.height,cw=W/9,ch=H/10;
+ctx.fillStyle='#e8d0aa';ctx.fillRect(0,0,W,H);
+ctx.strokeStyle='#8b7355';ctx.lineWidth=1;
+for(var r=0;r<10;r++){ctx.beginPath();ctx.moveTo(cw/2,ch/2+r*ch);ctx.lineTo(cw/2+8*cw,ch/2+r*ch);ctx.stroke();}
+for(var c=0;c<9;c++){ctx.beginPath();ctx.moveTo(cw/2+c*cw,ch/2);ctx.lineTo(cw/2+c*cw,ch/2+9*ch);ctx.stroke();}
+for(var r=0;r<10;r++)for(var c=0;c<9;c++){
+var p=rev.board[r][c];if(!p)continue;
+var x=cw/2+c*cw,y=ch/2+r*ch;
+ctx.beginPath();ctx.arc(x,y,Math.min(cw,ch)*0.42,0,Math.PI*2);
+ctx.fillStyle=p.color==='red'?'#fff0e0':'#e0e0e0';ctx.fill();
+ctx.strokeStyle=p.color==='red'?'#c0392b':'#333';ctx.lineWidth=2;ctx.stroke();
+ctx.fillStyle=p.color==='red'?'#c0392b':'#111';
+ctx.font='bold '+Math.floor(Math.min(cw,ch)*0.52)+'px serif';
+ctx.textAlign='center';ctx.textBaseline='middle';
+var t=(typeof PN!=='undefined'&&PN[p.type]&&PN[p.type][p.color])?PN[p.type][p.color]:'子';
+ctx.fillText(t,x,y+1);
+}
+}
+window.showRvPly=function(i){
+var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
+var rev=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
+drawMiniBoard(rev);
+var p=plies[i];var d=$id('rvDetail');if(!d)return;
+var w=p?scoreToRedWin(p.score,p.turn):null;
+var wTxt=(w==null)?'评估不可用':'红方胜率 '+w.toFixed(0)+'%';
+var dropTxt=(p&&p.drop!==undefined&&p.drop>=25)?(' · <span style="color:'+(p.drop>=45?'#e74c3c':'#f39c12')+'">此步失分 '+p.drop.toFixed(0)+'</span>'):'';
+d.innerHTML='第'+(i+1)+'步（'+(p&&p.turn==='red'?'红':'黑')+'方走后局面）· '+wTxt+dropTxt;
+};
+})();
 </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"0a4ff2af697e451c85fdf620787d507c","r":1}' crossorigin="anonymous"></script>
 </body>

@@ -94,6 +94,7 @@ class PikafishEngine {
             }
           } else if (data.type === 'bestmove') {
             if (this._pendingTimeout) clearTimeout(this._pendingTimeout);
+            this._lastScore = data.score || null;
             if (this._pendingResolve) {
               this._pendingResolve(data.move || null);
               this._pendingResolve = null;
@@ -184,6 +185,26 @@ class PikafishEngine {
         depth: depth,
         moveTime: moveTime
       });
+    });
+  }
+
+  // 复盘用：直接评估一个 FEN 局面，返回 {move, score}（score 为 side-to-move 视角）
+  async analyzeFen(fen, moveTime) {
+    moveTime = moveTime || 600;
+    if (!this.ready) {
+      await this.init();
+    }
+    var self = this;
+    return new Promise((resolve, reject) => {
+      this._pendingResolve = (move) => { resolve({ move: move, score: self._lastScore || null }); };
+      this._pendingReject = reject;
+      this._pendingTimeout = setTimeout(() => {
+        this.stop();
+        this._pendingResolve = null;
+        this._pendingReject = null;
+        reject(new Error('analysis timeout'));
+      }, moveTime + 30000);
+      this.worker.postMessage({ type: 'findBestMove', fen: fen, depth: 1, moveTime: moveTime });
     });
   }
 

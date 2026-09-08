@@ -25,6 +25,88 @@ var aiWeights = {
   kingSafety: 40
 };
 var aiTotalStats = { games: 0, redWins: 0, blkWins: 0, draws: 0 };
+
+// ===== 等级分系统 (Elo + 段位) =====
+var RANK_TIERS = [
+  [2200, "\u7279\u7ea7\u5927\u5e08"],
+  [2000, "\u5730\u533a\u5927\u5e08"],
+  [1800, "\u4e1a\u4f59\u4e00\u7ea7"],
+  [1600, "\u4e1a\u4f59\u4e8c\u7ea7"],
+  [1400, "\u4e1a\u4f59\u4e09\u7ea7"],
+  [1200, "\u4e1a\u4f59\u56db\u7ea7"],
+  [1000, "\u4e1a\u4f59\u4e94\u7ea7"],
+  [0, "\u4e1a\u4f59\u516d\u7ea7"]
+];
+function rankTitle(elo) {
+  for (const tier of RANK_TIERS) {
+    if (elo >= tier[0]) return tier[1];
+  }
+  return "\u4e1a\u4f59\u516d\u7ea7";
+}
+__name(rankTitle, "rankTitle");
+function kFactor(games, elo) {
+  if (games < 30) return 40;
+  if (elo >= 2e3) return 16;
+  return 32;
+}
+__name(kFactor, "kFactor");
+function expectedScore(a, b) {
+  return 1 / (1 + Math.pow(10, (b - a) / 400));
+}
+__name(expectedScore, "expectedScore");
+async function ensureRatingTables(db) {
+  if (!db) return;
+  try {
+    await db.exec("CREATE TABLE IF NOT EXISTS players (device_id TEXT PRIMARY KEY, name TEXT, elo INTEGER DEFAULT 1200, games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0, draws INTEGER DEFAULT 0, created_at INTEGER, last_seen INTEGER)");
+    await db.exec("CREATE TABLE IF NOT EXISTS games (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id TEXT, red_device TEXT, black_device TEXT, red_name TEXT, black_name TEXT, result TEXT, reason TEXT, moves INTEGER, red_elo_before INTEGER, black_elo_before INTEGER, red_elo_after INTEGER, black_elo_after INTEGER, end_ts INTEGER)");
+  } catch (e) {
+  }
+}
+__name(ensureRatingTables, "ensureRatingTables");
+async function upsertPlayer(db, deviceId, name) {
+  if (!db || !deviceId) return null;
+  const now = Date.now();
+  try {
+    await db.prepare("INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, 1200, 0, 0, 0, 0, ?, ?) ON CONFLICT(device_id) DO UPDATE SET last_seen = excluded.last_seen").bind(deviceId, name || null, now, now).run();
+    if (name) await db.prepare("UPDATE players SET name = ? WHERE device_id = ?").bind(name, deviceId).run();
+    return await db.prepare("SELECT * FROM players WHERE device_id = ?").bind(deviceId).first();
+  } catch (e) {
+    return null;
+  }
+}
+__name(upsertPlayer, "upsertPlayer");
+async function applyEloResult(db, roomId, red, black, result, reason, moveCount) {
+  if (!db || !red || !black || !red.dev || !black.dev || red.dev === black.dev) return null;
+  if (!["red", "black", "draw"].includes(result)) return null;
+  try {
+    const now = Date.now();
+    const insP = "INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, 1200, 0, 0, 0, 0, ?, ?)";
+    const r0 = await db.prepare("SELECT elo, games FROM players WHERE device_id = ?").bind(red.dev).first();
+    if (!r0) await db.prepare(insP).bind(red.dev, red.name || null, now, now).run();
+    const b0 = await db.prepare("SELECT elo, games FROM players WHERE device_id = ?").bind(black.dev).first();
+    if (!b0) await db.prepare(insP).bind(black.dev, black.name || null, now, now).run();
+    const before = { red: r0 ? r0.elo : 1200, black: b0 ? b0.elo : 1200 };
+    const rGames = r0 ? r0.games : 0;
+    const bGames = b0 ? b0.games : 0;
+    const expR = expectedScore(before.red, before.black);
+    const scoreR = result === "red" ? 1 : result === "draw" ? 0.5 : 0;
+    const dR = Math.round(kFactor(rGames, before.red) * (scoreR - expR));
+    const dB = Math.round(kFactor(bGames, before.black) * (1 - scoreR - (1 - expR)));
+    const after = { red: Math.max(100, before.red + dR), black: Math.max(100, before.black + dB) };
+    const wr = result === "red" ? 1 : 0;
+    const br = result === "black" ? 1 : 0;
+    const dr = result === "draw" ? 1 : 0;
+    await db.batch([
+      db.prepare("UPDATE players SET elo = ?, games = games + 1, wins = wins + ?, losses = losses + ?, draws = draws + ?, last_seen = ? WHERE device_id = ?").bind(after.red, wr, br, dr, now, red.dev),
+      db.prepare("UPDATE players SET elo = ?, games = games + 1, wins = wins + ?, losses = losses + ?, draws = draws + ?, last_seen = ? WHERE device_id = ?").bind(after.black, br, wr, dr, now, black.dev),
+      db.prepare("INSERT INTO games (room_id, red_device, black_device, red_name, black_name, result, reason, moves, red_elo_before, black_elo_before, red_elo_after, black_elo_after, end_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(roomId || null, red.dev, black.dev, red.name || null, black.name || null, result, reason || null, moveCount || 0, before.red, before.black, after.red, after.black, now)
+    ]);
+    return { red: { before: before.red, after: after.red }, black: { before: before.black, after: after.black } };
+  } catch (e) {
+    return null;
+  }
+}
+__name(applyEloResult, "applyEloResult");
 function broadcastOnlineCount() {
   const msg = JSON.stringify({ event: "online_count", data: onlineCount });
   for (const ws of activeConnections) {
@@ -62,6 +144,8 @@ var ChessRoom = class {
         capturedBlack: [],
         playerTokens: null,
         gameStarted: false,
+        seatIdentity: {},
+        _ratedRecorded: false,
         createdAt: Date.now()
       };
       try {
@@ -83,6 +167,8 @@ var ChessRoom = class {
               this.room.createdAt = s.createdAt;
               this.room.playerTokens = s.playerTokens || null;
               this.room.gameStarted = !!s.gameStarted;
+              this.room.seatIdentity = s.seatIdentity || {};
+              this.room._ratedRecorded = !!s._ratedRecorded;
               this.room._restoredFromDb = true;
             }
           }
@@ -108,6 +194,8 @@ var ChessRoom = class {
         capturedBlack: this.room.capturedBlack || [],
         playerTokens: this.room.playerTokens || null,
         gameStarted: !!this.room.gameStarted,
+        seatIdentity: this.room.seatIdentity || {},
+        _ratedRecorded: !!this.room._ratedRecorded,
         createdAt: this.room.createdAt
       });
       await this.env.CHESS_DB.prepare(
@@ -231,6 +319,7 @@ var ChessRoom = class {
             this.room.playerTokens[myColor] = myPid;
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
+            this._setSeatIdentity(myColor, payload);
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
           } else {
             let myColor;
@@ -246,6 +335,7 @@ var ChessRoom = class {
             this.room.playerTokens[myColor] = myPid;
             this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: myColor, assignedAt: Date.now() });
             socketData.color = myColor;
+            this._setSeatIdentity(myColor, payload);
             ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: myColor, pid: myPid } }));
           }
         } else if (eventName === "join_room") {
@@ -275,6 +365,7 @@ var ChessRoom = class {
           this.room.playerTokens[color] = joinPid;
           this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
+          this._setSeatIdentity(color, payload);
           if (this.room.players.size >= 2) this.room.gameStarted = true;
           ws.send(JSON.stringify({ event: "room_joined", data: { roomId: this.room.id, color, pid: joinPid } }));
           this.broadcastRoomState();
@@ -335,6 +426,7 @@ var ChessRoom = class {
             }
           }
           const opponentMove = { ...move, redLeft: this.room.redTime, blkLeft: this.room.blkTime };
+          if (move.gameOver) this.ctx.waitUntil(this._recordGameEnd("checkmate"));
           const ackData = { moveHistoryLen: this.room.moveHistory.length, lastMove: { fromRow: move.fromRow, fromCol: move.fromCol, toRow: move.toRow, toCol: move.toCol }, currentTurn: this.room.currentTurn };
           try {
             ws.send(JSON.stringify({ event: "move_ack", data: ackData }));
@@ -354,6 +446,7 @@ var ChessRoom = class {
             this.room._timer = null;
           }
           this.broadcastToRoom(JSON.stringify({ event: "game_over", data: { winner: this.room.winner, reason: "resign" } }));
+          this.ctx.waitUntil(this._recordGameEnd("resign"));
           await this._saveRoomState();
         } else if (eventName === "request_draw") {
           if (!this.room) return;
@@ -368,6 +461,7 @@ var ChessRoom = class {
             this.room._timer = null;
           }
           this.broadcastToRoom(JSON.stringify({ event: "game_over", data: { winner: "draw", reason: "draw" } }));
+          this.ctx.waitUntil(this._recordGameEnd("draw"));
           await this._saveRoomState();
         } else if (eventName === "reject_draw") {
           if (!this.room) return;
@@ -396,6 +490,12 @@ var ChessRoom = class {
             this.room.playerTokens.red = this.room.playerTokens.black;
             this.room.playerTokens.black = tmpTok;
           }
+          if (this.room.seatIdentity) {
+            const tmpId = this.room.seatIdentity.red;
+            this.room.seatIdentity.red = this.room.seatIdentity.black;
+            this.room.seatIdentity.black = tmpId;
+          }
+          this.room._ratedRecorded = false;
           this.room.gameOver = false;
           this.room._gameEndedAt = null;
           this.room.winner = null;
@@ -520,6 +620,7 @@ var ChessRoom = class {
           }
           this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color, assignedAt: Date.now() });
           socketData.color = color;
+          this._setSeatIdentity(color, payload);
           if (this.room.players.size >= 2) this.room.gameStarted = true;
           const gameInProgress = !this.room.gameOver && this.room.moveHistory.length > 0;
           try {
@@ -620,6 +721,7 @@ var ChessRoom = class {
               this.room.winner = color === "red" ? "black" : "red";
               this.broadcastToRoom(JSON.stringify({ event: "game_over", data: { winner: this.room.winner, reason: "disconnect_timeout" } }));
               this.broadcastToRoom(JSON.stringify({ event: "room_timeout", data: {} }));
+              this.ctx.waitUntil(this._recordGameEnd("disconnect_timeout"));
               if (this.room._timer) {
                 clearInterval(this.room._timer);
                 this.room._timer = null;
@@ -709,6 +811,7 @@ var ChessRoom = class {
     }
   }
   getRoomState() {
+    const si = this.room.seatIdentity || {};
     return {
       roomId: this.room.id,
       playerCount: this.room.players.size,
@@ -720,8 +823,45 @@ var ChessRoom = class {
       blkTime: this.room.blkTime,
       capturedRed: this.room.capturedRed,
       capturedBlack: this.room.capturedBlack,
-      gameStarted: this.room.players.size >= 2
+      gameStarted: this.room.players.size >= 2,
+      seatInfo: {
+        red: si.red ? { name: si.red.name || null, elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
+        black: si.black ? { name: si.black.name || null, elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
+      }
     };
+  }
+  _setSeatIdentity(color, payload) {
+    if (!color || !payload || typeof payload !== "object") return;
+    if (!this.room.seatIdentity) this.room.seatIdentity = {};
+    const prev = this.room.seatIdentity[color] || {};
+    this.room.seatIdentity[color] = {
+      dev: payload.deviceId ? String(payload.deviceId).slice(0, 64) : prev.dev || null,
+      name: payload.playerName ? String(payload.playerName).slice(0, 24) : prev.name || null,
+      elo: Number.isFinite(payload.elo) ? Math.round(payload.elo) : prev.elo || null
+    };
+  }
+  async _recordGameEnd(reason) {
+    if (!this.room || !this.env.CHESS_DB || this.room._ratedRecorded) return;
+    const si = this.room.seatIdentity || {};
+    const red = si.red;
+    const black = si.black;
+    if (!red || !black || !red.dev || !black.dev || red.dev === black.dev) return;
+    if (!this.room.moveHistory || this.room.moveHistory.length < 2) return;
+    const result = this.room.winner === "red" ? "red" : this.room.winner === "black" ? "black" : "draw";
+    this.room._ratedRecorded = true;
+    const res = await applyEloResult(this.env.CHESS_DB, this.room.id, red, black, result, reason, this.room.moveHistory.length);
+    if (res) {
+      try {
+        this.broadcastToRoom(JSON.stringify({ event: "rating_update", data: {
+          red: { name: red.name || null, before: res.red.before, after: res.red.after, title: rankTitle(res.red.after) },
+          black: { name: black.name || null, before: res.black.before, after: res.black.after, title: rankTitle(res.black.after) }
+        } }));
+      } catch (e) {
+      }
+      this.ctx.waitUntil(this._saveRoomState());
+    } else {
+      this.room._ratedRecorded = false;
+    }
   }
   startRoomTimer() {
     if (!this.room) return;
@@ -749,6 +889,7 @@ var ChessRoom = class {
           this.room._timer = null;
           this.broadcastToRoom(JSON.stringify({ event: "timeout", data: { winner: "black" } }));
           this.broadcastToRoom(JSON.stringify({ event: "game_over", data: { winner: "black", reason: "timeout" } }));
+          this.ctx.waitUntil(this._recordGameEnd("timeout"));
           this._saveRoomState();
         }
       } else {
@@ -761,6 +902,7 @@ var ChessRoom = class {
           this.room._timer = null;
           this.broadcastToRoom(JSON.stringify({ event: "timeout", data: { winner: "red" } }));
           this.broadcastToRoom(JSON.stringify({ event: "game_over", data: { winner: "red", reason: "timeout" } }));
+          this.ctx.waitUntil(this._recordGameEnd("timeout"));
           this._saveRoomState();
         }
       }
@@ -817,6 +959,103 @@ async function saveAiToDb(db) {
   }
 }
 __name(saveAiToDb, "saveAiToDb");
+// ===== 快速匹配队列 (全局 DO) =====
+var MatchQueue = class {
+  static {
+    __name(this, "MatchQueue");
+  }
+  constructor(ctx, env) {
+    this.ctx = ctx;
+    this.env = env;
+    this.queue = [];
+    this.pairings = /* @__PURE__ */ new Map();
+  }
+  async _tryPair() {
+    const now = Date.now();
+    this.queue = this.queue.filter((e) => now - e.ts < 12e4);
+    if (this.queue.length < 2) return;
+    const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
+    const pairedTickets = /* @__PURE__ */ new Set();
+    for (let i = 0; i < sorted.length; i++) {
+      const a = sorted[i];
+      if (pairedTickets.has(a.ticket)) continue;
+      for (let j = i + 1; j < sorted.length; j++) {
+        const b = sorted[j];
+        if (pairedTickets.has(b.ticket)) continue;
+        const waitSec = Math.floor((now - Math.min(a.ts, b.ts)) / 1e3);
+        const tol = 150 + waitSec * 10;
+        if (Math.abs(a.elo - b.elo) <= tol) {
+          pairedTickets.add(a.ticket);
+          pairedTickets.add(b.ticket);
+          const roomId = "M" + Math.random().toString(36).slice(2, 6) + now.toString(36).slice(-4);
+          const redIsA = Math.random() < 0.5;
+          this.pairings.set(a.ticket, { data: { roomId, color: redIsA ? "red" : "black", oppName: b.name || null, oppElo: b.elo || null, rated: true }, ts: now });
+          this.pairings.set(b.ticket, { data: { roomId, color: redIsA ? "black" : "red", oppName: a.name || null, oppElo: a.elo || null, rated: true }, ts: now });
+          break;
+        }
+      }
+    }
+    if (pairedTickets.size) {
+      this.queue = this.queue.filter((e) => !pairedTickets.has(e.ticket));
+      if (this.pairings.size > 500) {
+        const entries = [...this.pairings.entries()].sort((x, y) => x[1].ts - y[1].ts);
+        for (let k = 0; k < 250; k++) this.pairings.delete(entries[k][0]);
+      }
+    }
+  }
+  async _scheduleSweep() {
+    if (this.queue.length > 0) {
+      try {
+        await this.ctx.storage.setAlarm(Date.now() + 2e3);
+      } catch (e) {
+      }
+    }
+  }
+  async alarm() {
+    await this._tryPair();
+    await this._scheduleSweep();
+  }
+  async fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    if (path === "/join" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        if (!body || !body.deviceId) return Response.json({ ok: false, error: "deviceId required" });
+        const ticket = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const elo = Number.isFinite(body.elo) ? Math.round(body.elo) : 1200;
+        this.queue = this.queue.filter((e) => e.deviceId !== body.deviceId);
+        this.queue.push({ ticket, deviceId: String(body.deviceId).slice(0, 64), name: body.name ? String(body.name).slice(0, 24) : null, elo, ts: Date.now() });
+        await this._tryPair();
+        await this._scheduleSweep();
+        return Response.json({ ok: true, ticket });
+      } catch (e) {
+        return Response.json({ ok: false, error: "bad request" }, { status: 400 });
+      }
+    }
+    if (path === "/status") {
+      const ticket = url.searchParams.get("ticket");
+      const p = ticket && this.pairings.get(ticket);
+      if (p) {
+        this.pairings.delete(ticket);
+        return Response.json({ ok: true, state: "paired", roomId: p.data.roomId, color: p.data.color, oppName: p.data.oppName, oppElo: p.data.oppElo });
+      }
+      const still = ticket && this.queue.some((e) => e.ticket === ticket);
+      return Response.json({ ok: true, state: still ? "waiting" : "none" });
+    }
+    if (path === "/cancel" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        this.queue = this.queue.filter((e) => e.ticket !== body.ticket);
+        return Response.json({ ok: true });
+      } catch (e) {
+        return Response.json({ ok: false }, { status: 400 });
+      }
+    }
+    return Response.json({ ok: false, error: "unknown" }, { status: 404 });
+  }
+};
+__name(MatchQueue, "MatchQueue");
 async function handleApiRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -827,6 +1066,68 @@ async function handleApiRequest(request, env) {
   };
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  const json = (obj, status) => new Response(JSON.stringify(obj), { status: status || 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (path === "/api/player/register" && request.method === "POST") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureRatingTables(env.CHESS_DB);
+    try {
+      const body = await request.json();
+      if (!body.deviceId) return json({ error: "deviceId required" }, 400);
+      const p = await upsertPlayer(env.CHESS_DB, String(body.deviceId).slice(0, 64), body.name ? String(body.name).slice(0, 24) : null);
+      return json({ ok: true, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
+    } catch (e) {
+      return json({ error: "bad request" }, 400);
+    }
+  }
+  if (path === "/api/player/profile") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureRatingTables(env.CHESS_DB);
+    const devId = url.searchParams.get("deviceId");
+    if (!devId) return json({ error: "deviceId required" }, 400);
+    const p = await env.CHESS_DB.prepare("SELECT * FROM players WHERE device_id = ?").bind(String(devId).slice(0, 64)).first();
+    return json({ ok: true, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
+  }
+  if (path === "/api/leaderboard") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureRatingTables(env.CHESS_DB);
+    const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws FROM players WHERE games > 0 ORDER BY elo DESC LIMIT 50").all();
+    return json({ ok: true, list: (rows.results || []).map((r, i) => ({ rank: i + 1, name: r.name || "\u68cb\u624b" + String(r.device_id).slice(0, 4), elo: r.elo, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, title: rankTitle(r.elo) })) });
+  }
+  if (path === "/api/match/join" && request.method === "POST" && env.MATCH_QUEUE) {
+    try {
+      const body = await request.json();
+      if (!body.deviceId) return json({ error: "deviceId required" }, 400);
+      const id = env.MATCH_QUEUE.idFromName("global");
+      const stub = env.MATCH_QUEUE.get(id);
+      const resp = await stub.fetch("https://do/join", { method: "POST", body: JSON.stringify({ deviceId: body.deviceId, name: body.name, elo: body.elo }) });
+      return json(await resp.json());
+    } catch (e) {
+      return json({ error: "match unavailable" }, 503);
+    }
+  }
+  if (path === "/api/match/status" && env.MATCH_QUEUE) {
+    try {
+      const ticket = url.searchParams.get("ticket");
+      if (!ticket) return json({ error: "ticket required" }, 400);
+      const id = env.MATCH_QUEUE.idFromName("global");
+      const stub = env.MATCH_QUEUE.get(id);
+      const resp = await stub.fetch("https://do/status?ticket=" + encodeURIComponent(ticket));
+      return json(await resp.json());
+    } catch (e) {
+      return json({ error: "match unavailable" }, 503);
+    }
+  }
+  if (path === "/api/match/cancel" && request.method === "POST" && env.MATCH_QUEUE) {
+    try {
+      const body = await request.json();
+      const id = env.MATCH_QUEUE.idFromName("global");
+      const stub = env.MATCH_QUEUE.get(id);
+      const resp = await stub.fetch("https://do/cancel", { method: "POST", body: JSON.stringify({ ticket: body.ticket }) });
+      return json(await resp.json());
+    } catch (e) {
+      return json({ error: "match unavailable" }, 503);
+    }
   }
   if (env.CHESS_DB) {
     await initAiDb(env.CHESS_DB);
@@ -976,7 +1277,7 @@ async function handleWebSocket(ws, env) {
         } catch (e) {
         }
       } else if (eventName === "join_room") {
-        const roomId = payload;
+        const roomId = payload && typeof payload === "object" ? payload.roomId : payload;
         ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "join" } }));
       } else if (eventName === "reconnect_room") {
         const roomId = payload.roomId;
@@ -1001,6 +1302,7 @@ async function handleWebSocket(ws, env) {
 __name(handleWebSocket, "handleWebSocket");
 export {
   ChessRoom,
+  MatchQueue,
   index_default as default
 };
 //# sourceMappingURL=index.js.map

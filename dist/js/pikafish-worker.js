@@ -95,6 +95,21 @@ var Module = {
 // onmessage handler
 // pikafish.js 已在 Blob 中执行完毕，FS/createWasm/run 等全局可用
 // ============================================================
+
+// 解析引擎输出中最后一个 info 分数（side-to-move 视角）
+function _lastScore() {
+  for (var j = _outputLines.length - 1; j >= 0; j--) {
+    var line = _outputLines[j];
+    if (!line || line.indexOf('info') !== 0) continue;
+    var m = line.match(/score (cp|mate) (-?\d+)/);
+    if (m) {
+      var d = line.match(/depth (\d+)/);
+      return { type: m[1], value: parseInt(m[2], 10), depth: d ? parseInt(d[1], 10) : 0 };
+    }
+  }
+  return null;
+}
+
 self.onmessage = async function(e) {
   var data = e.data;
 
@@ -324,7 +339,7 @@ self.onmessage = async function(e) {
 
   } else if (data.type === 'findBestMove') {
     var result = _doSearch(data.fen, data.depth, data.moveTime);
-    self.postMessage({ type: 'bestmove', move: result });
+    self.postMessage({ type: 'bestmove', move: result, score: _lastScore() });
   } else if (data.type === 'shutdown') {
     log('Shutdown');
   }
