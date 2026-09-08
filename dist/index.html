@@ -6432,6 +6432,23 @@ function attachP1Handlers(){
 if(typeof socket!=='undefined'&&socket){
 try{socket.on('rating_update',function(d){window._xqOnRatingUpdate(d);});}catch(e){}
 try{
+socket.on('game_over',function(d){
+if(!d||window._autoLobbyDone)return;
+if(d.reason==='opponent_left'||d.reason==='disconnect_timeout'){
+window._autoLobbyDone=true;
+if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
+var _n=12;
+var _txt=d.reason==='opponent_left'?'对手已退出对局':'对手断线超时';
+showOverlay('<h2>🏆 '+_txt+'</h2><p>你获得本局胜利，棋力分已结算。</p><p style="font-size:18px;color:#d4a843"><b id="_autoLobbyN">'+_n+'</b> 秒后自动返回大厅</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="hideOverlay();doLeaveGame()">立即返回大厅</button></div>');
+window._dcTimer=setInterval(function(){
+_n--;
+var el=document.getElementById('_autoLobbyN');if(el)el.textContent=_n;
+if(_n<=0){clearInterval(window._dcTimer);window._dcTimer=null;hideOverlay();try{doLeaveGame();}catch(e){}}
+},1000);
+}
+});
+}catch(e){}
+try{
 var nm=function(d){applySeatNames(d&&d.seatInfo,(typeof myCl!=='undefined')?myCl:null);};
 socket.on('room_created',nm);
 socket.on('room_joined',nm);
