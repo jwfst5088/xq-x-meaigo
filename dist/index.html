@@ -1400,6 +1400,7 @@ function leaveGame(){
 showOverlay('<h2>退出对局</h2><p>确认退出当前对局？</p><div class="btns2"><button class="btn btn-red" onclick="doLeaveGame()">确认退出</button><button class="btn btn-outline" onclick="hideOverlay()">取消</button></div>');
 }
 function returnToLobby(){
+try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 soundEnabled=false;gameOverSoundPlayed=false;
 if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
 stopTimer();stopAi();gameStarted=false;selected=null;validMoves=[];capRed=[];capBlk=[];lastMove=null;engine.initBoard();
@@ -1410,6 +1411,7 @@ D('lobbyStatus').textContent=sockOk?'● 服务器已连接':'○ 服务器离�
 try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_game');}catch(e){}
 }
 function doLeaveGame(){
+try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 if(document.fullscreenElement||document.webkitFullscreenElement){
 if(document.exitFullscreen)document.exitFullscreen();
 else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
