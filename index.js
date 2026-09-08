@@ -887,8 +887,8 @@ var ChessRoom = class {
       capturedBlack: this.room.capturedBlack,
       gameStarted: this.room.players.size >= 2,
       seatInfo: {
-        red: si.red ? { name: si.red.name || null, elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
-        black: si.black ? { name: si.black.name || null, elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
+        red: si.red ? { name: si.red.name || (si.red.dev ? "\u73a9\u5bb6" + String(si.red.dev).slice(-4) : null), elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
+        black: si.black ? { name: si.black.name || (si.black.dev ? "\u73a9\u5bb6" + String(si.black.dev).slice(-4) : null), elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
       }
     };
   }
