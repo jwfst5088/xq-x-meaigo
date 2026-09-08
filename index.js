@@ -887,8 +887,8 @@ var ChessRoom = class {
       capturedBlack: this.room.capturedBlack,
       gameStarted: this.room.players.size >= 2,
       seatInfo: {
-        red: si.red ? { name: si.red.name || (si.red.dev ? "\u73a9\u5bb6" + String(si.red.dev).slice(-4) : null), elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
-        black: si.black ? { name: si.black.name || (si.black.dev ? "\u73a9\u5bb6" + String(si.black.dev).slice(-4) : null), elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
+        red: si.red ? { name: si.red.name || (si.red.dev ? "\u6e38\u5ba2" : null), elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
+        black: si.black ? { name: si.black.name || (si.black.dev ? "\u6e38\u5ba2" : null), elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
       }
     };
   }
@@ -1278,7 +1278,7 @@ async function handleApiRequest(request, env) {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureRatingTables(env.CHESS_DB);
     const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws FROM players WHERE games > 0 ORDER BY elo DESC LIMIT 50").all();
-    return json({ ok: true, list: (rows.results || []).map((r, i) => ({ rank: i + 1, name: r.name || "\u68cb\u624b" + String(r.device_id).slice(0, 4), elo: r.elo, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, title: rankTitle(r.elo) })) });
+    return json({ ok: true, list: (rows.results || []).map((r, i) => ({ rank: i + 1, name: r.name || "\u6e38\u5ba2", games: r.games, wins: r.wins, losses: r.losses, draws: r.draws })) });
   }
   if (path === "/api/match/join" && request.method === "POST" && env.MATCH_QUEUE) {
     try {
@@ -1362,6 +1362,24 @@ async function handleApiRequest(request, env) {
       return json({ ok: true, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
     } catch (e) {
       return json({ ok: false, error: "修改失败" }, 500);
+    }
+  }
+  if (path === "/api/admin/deletePlayer" && request.method === "POST" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    try {
+      const b = await request.json();
+      const dev = b && b.deviceId ? String(b.deviceId).slice(0, 64) : null;
+      if (!dev) return json({ ok: false, error: "参数错误" }, 400);
+      await env.CHESS_DB.prepare("DELETE FROM players WHERE device_id = ?").bind(dev).run();
+      if (dev.startsWith("U:")) {
+        try {
+          await env.CHESS_DB.prepare("DELETE FROM user_auth WHERE username = ?").bind(dev.slice(2)).run();
+        } catch (e2) {
+        }
+      }
+      return json({ ok: true, deleted: dev });
+    } catch (e) {
+      return json({ ok: false, error: "删除失败" }, 500);
     }
   }
   if (path === "/api/admin/players") return json({ ok: false, error: "未登录" }, 401);

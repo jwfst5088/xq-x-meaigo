@@ -109,7 +109,7 @@ function render() {
       + "<td>" + p.wins + "/" + p.losses + "/" + p.draws + "</td>"
       + "<td class=\"mut\" style=\"max-width:220px;word-break:break-all\">" + esc(id) + "</td>"
       + "<td class=\"mut\">" + (p.last_seen ? new Date(p.last_seen).toLocaleString() : "-") + "</td>"
-      + "<td><button class=\"save\" onclick=\"save(" + i + ")\">保存</button></td>"
+      + "<td><button class=\"save\" onclick=\"save(" + i + ")\">保存</button> <button class=\"save\" style=\"border-color:#e74c3c;color:#e74c3c\" onclick=\"del(" + i + ")\">删除</button></td>"
       + "</tr>";
   });
   rows.innerHTML = h || '<tr><td colspan="8" class="mut">无匹配玩家</td></tr>';
@@ -129,9 +129,24 @@ function save(i) {
     }
   }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
 }
+function del(i) {
+  var p = DATA[i];
+  if (!confirm("确定删除玩家 " + (p.name || p.deviceId) + "（" + p.deviceId + "）？此操作不可恢复。")) return;
+  api("/api/admin/deletePlayer", { token: TOKEN, deviceId: p.deviceId }).then(function (r) {
+    var m = document.getElementById("msg");
+    if (r && r.ok) {
+      m.textContent = "✔ 已删除: " + (p.name || p.deviceId);
+      DATA.splice(i, 1);
+      document.getElementById("cnt").textContent = "玩家总数: " + DATA.length;
+      render();
+    } else {
+      m.textContent = "✘ " + ((r && r.error) || "删除失败");
+    }
+  }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
+}
 if (TOKEN) {
   enter();
-} 
+}
 </script>
 </body>
 </html>
