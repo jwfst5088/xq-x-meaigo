@@ -350,7 +350,19 @@ var ChessRoom = class {
             if (st === 2 || st === 3 || rep) this.room.players.delete(pws);
           }
           if (this.room.players.size === 0) {
-            ws.send(JSON.stringify({ event: "error", data: "\u623F\u95F4\u4E0D\u5B58\u5728" }));
+            // 匹配出来的房间没有"创建者"：第一个进入者直接入座（快速匹配场景）
+            const firstPid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+            const firstColor = "red";
+            if (!this.room.playerTokens) this.room.playerTokens = {};
+            this.room.playerTokens[firstColor] = firstPid;
+            this.room.players.set(ws, { id: Math.random().toString(36).slice(2), color: firstColor, assignedAt: Date.now() });
+            socketData.color = firstColor;
+            this._setSeatIdentity(firstColor, payload);
+            try {
+              ws.send(JSON.stringify({ event: "room_created", data: { roomId: this.room.id, color: firstColor, pid: firstPid } }));
+            } catch (e) {
+            }
+            this.broadcastRoomState();
             return;
           }
           if (this.room.players.size >= 2) {
