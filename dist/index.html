@@ -6364,19 +6364,27 @@ p.style.display=p.style.display==='none'?'':'none';
 
 // ---------- 快速匹配 ----------
 var _matching=false,_matchTicket=null,_matchTimer=null,_matchStarted=0;
+function ensureLobbySocket(){
+try{
+if(typeof connectSocket==='function'&&((typeof socket==='undefined')||!socket||(typeof sockOk!=='undefined'&&!sockOk))){connectSocket();}
+}catch(e){}
+}
 window.quickMatch=function(){
 if(_matching){cancelMatch();toast('已取消匹配');return;}
-if(typeof sockOk==='undefined'||!sockOk){toast('服务器未连接，请稍候再试');return;}
-if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){toast('已在对局中');return;}
+// 在对局界面中才拦截；大厅里即使 gm 残留也放行
+if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm&&typeof D==='function'&&D('game')&&D('game').classList.contains('show')){toast('已在对局中');return;}
 _matching=true;_matchStarted=Date.now();
+ensureLobbySocket();
 var btn0=$id('matchBtn');if(btn0)btn0.textContent='⏳ 匹配中…';
+var hint=$id('matchHint');if(hint){hint.textContent='正在加入匹配队列…';hint.style.color='#c4a882';}
 api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())}).then(function(r){
-if(!r||!r.ok){_matching=false;resetMatchBtn();toast(r&&r.error?r.error:'匹配服务不可用');return;}
+if(!r||!r.ok){_matching=false;resetMatchBtn();var m=(r&&r.error)?r.error:'匹配服务不可用';toast(m);var h=$id('matchHint');if(h){h.textContent='❌ '+m;h.style.color='#e74c3c';}return;}
 _matchTicket=r.ticket;
 var btn=$id('matchBtn');
-if(btn){btn.textContent='⏳ 匹配中… 点击取消';btn.classList.add('matching');}
+if(btn){btn.textContent='⏳ 匹配中…';btn.classList.add('matching');}
+var h2=$id('matchHint');if(h2){h2.textContent='已入队 · 等待对手…';h2.style.color='#c4a882';}
 pollMatch();
-}).catch(function(){_matching=false;resetMatchBtn();toast('匹配服务不可用');});
+}).catch(function(e){_matching=false;resetMatchBtn();toast('匹配服务不可用');var h3=$id('matchHint');if(h3){h3.textContent='❌ 网络异常: '+(e&&e.message||e);h3.style.color='#e74c3c';}});
 };
 function pollMatch(){
 if(!_matching||!_matchTicket)return;
@@ -6385,8 +6393,11 @@ if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){canc
 var waited=Math.floor((Date.now()-_matchStarted)/1000);
 var btn=$id('matchBtn');
 if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
-// 15秒无人：明示AI补位（按商业化方案，AI对局不计分）
+// 15秒无人：看在线人数决定（≥2人在线继续等真人，40秒硬上限后AI补位）
 if(waited>=15){
+var oc=(typeof D==='function'&&D('onlineCount'))?D('onlineCount').textContent:'';
+var om=parseInt((oc.match(/\d+/)||['1'])[0],10)||1;
+if(om>=2&&waited<40){_matchTimer=setTimeout(pollMatch,2000);return;}
 cancelMatch();
 toast('⚡ 当前在线较少，已为您匹配 AI 对手陪练',2800);
 if(typeof startAiGame==='function'){startAiGame();}
@@ -6403,9 +6414,9 @@ else if(_matching){_matchTimer=setTimeout(pollMatch,2500);}
 }).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
 return;
 }
-if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s · 排队'+((r&&r.queueSize)||1)+'人'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
+if(btn&&waited>=2){btn.textContent='⏳ 匹配中… '+waited+'s · 排队'+((r&&r.queueSize)||1)+'人'+(waited>=6?' · '+(waited<40?'AI补位倒计时':''):'');var hh=$id('matchHint');if(hh){hh.textContent='已入队 · 排队'+((r&&r.queueSize)||1)+'人 · 等待对手加入';hh.style.color='#c4a882';}}
 _matchTimer=setTimeout(pollMatch,2000);
-}).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
+}).catch(function(e){if(_matching){var h4=$id('matchHint');if(h4){h4.textContent='⚠️ 轮询异常，重试中…';h4.style.color='#f39c12';}_matchTimer=setTimeout(pollMatch,2500);}});
 }
 function cancelMatch(){
 _matching=false;
@@ -6416,12 +6427,17 @@ resetMatchBtn();
 function resetMatchBtn(){
 var btn=$id('matchBtn');
 if(btn){btn.textContent='⚡ 快速匹配';btn.classList.remove('matching');}
+var h=$id('matchHint');if(h){h.textContent='按等级分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分';h.style.color='';}
 }
 function enterMatchRoom(roomId){
 try{localStorage.setItem('xq_last_color','');}catch(e){}
+ensureLobbySocket();
 if(typeof socket!=='undefined'&&socket&&typeof socket.reconnectToRoom==='function'){
 window._pendingRoomAction=Object.assign({roomId:roomId,action:'join'},window._xqIdentityFields());
 socket.reconnectToRoom(roomId);
+}else{
+toast('连接服务器失败，请刷新页面重试',3000);
+var h5=$id('matchHint');if(h5){h5.textContent='❌ 进房失败：无法连接服务器，请刷新页面';h5.style.color='#e74c3c';}
 }
 }
 window.addEventListener('beforeunload',function(){if(_matching)cancelMatch();});

@@ -1091,6 +1091,10 @@ var MatchQueue = class {
         return Response.json({ ok: false }, { status: 400 });
       }
     }
+    if (path === "/debug") {
+      const now = Date.now();
+      return Response.json({ ok: true, queueSize: this.queue.length, pairings: this.pairings.size, queue: this.queue.map((e) => ({ dev: String(e.deviceId).slice(0, 6) + "***", name: e.name || null, elo: e.elo, ageSec: Math.floor((now - e.ts) / 1e3), ticket: String(e.ticket).slice(0, 6) })) });
+    }
     return Response.json({ ok: false, error: "unknown" }, { status: 404 });
   }
 };
@@ -1152,6 +1156,16 @@ async function handleApiRequest(request, env) {
       const id = env.MATCH_QUEUE.idFromName("global");
       const stub = env.MATCH_QUEUE.get(id);
       const resp = await stub.fetch("https://do/status?ticket=" + encodeURIComponent(ticket));
+      return json(await resp.json());
+    } catch (e) {
+      return json({ error: "match unavailable" }, 503);
+    }
+  }
+  if (path === "/api/match/debug" && env.MATCH_QUEUE) {
+    try {
+      const id = env.MATCH_QUEUE.idFromName("global");
+      const stub = env.MATCH_QUEUE.get(id);
+      const resp = await stub.fetch("https://do/debug");
       return json(await resp.json());
     } catch (e) {
       return json({ error: "match unavailable" }, 503);
