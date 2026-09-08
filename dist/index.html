@@ -169,6 +169,9 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 #lobby .footer{width:100%;text-align:center;margin-top:auto;padding:10px}
 .auth-input{width:100%;padding:12px;border:2px solid #5a3a28;border-radius:10px;background:#1a0f0a;color:#f0e6d3;font-size:15px;outline:none;margin:10px 0 14px;box-sizing:border-box;font-family:inherit}
 .auth-input:focus{border-color:#d4a843}
+.auth-tabs{display:flex;gap:6px;margin-bottom:10px}
+.auth-tab{flex:1;padding:8px 0;background:transparent;border:1px solid #3d2117;border-radius:8px;color:#8b7355;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.auth-tab.active{background:#3d2117;color:#d4a843;border-color:#d4a843}
 #rvPanel{position:fixed;z-index:150;background:#2c1810;border:1px solid #5a3a28;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);width:480px;max-width:calc(100vw - 20px);box-sizing:border-box}
 .rv-head{display:flex;justify-content:space-between;align-items:center}
 .rv-close{background:transparent;border:none;color:#8b7355;font-size:13px;cursor:pointer;padding:2px 6px;font-family:inherit}
@@ -192,7 +195,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="lb-brand"><span class="logo">♚</span><span class="title">中国象棋</span><span class="sub">在线对弈平台</span></div>
 <div class="user-area">
 <button id="loginBtn" class="auth-btn" onclick="openAuthModal()">登录 / 注册</button>
-<div id="profileBox" class="user-chip" style="display:none" onclick="openAuthModal()" title="点击修改昵称">
+<div id="profileBox" class="user-chip" style="display:none" onclick="profileChipClick()" title="点击管理账号">
 <div class="uc-avatar" id="ucAvatar">客</div>
 <div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div><div class="uc-stats">Elo <b id="pfElo">1200</b> · <span id="pfRecord">0胜 0和 0负</span></div></div>
 </div>
@@ -241,9 +244,19 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="overlay" id="authOverlay" style="display:none">
 <div class="box" style="text-align:left;max-width:320px">
 <h2 style="text-align:center">登录 / 注册</h2>
-<p style="text-align:left">无需密码：设备号自动创建账号。设置昵称后即可参与段位对战、等级分结算与排行榜。</p>
-<input id="authNameInput" class="auth-input" placeholder="输入昵称（最多12字）" maxlength="12" onkeydown="if(event.key==='Enter')saveAuthName()">
-<div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 26px" onclick="saveAuthName()">确认</button><button class="btn btn-outline" style="width:auto;padding:10px 26px" onclick="closeAuthModal()">取消</button></div>
+<div class="auth-tabs"><button id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">登录</button><button id="tabReg" class="auth-tab" onclick="switchAuthTab('reg')">注册</button></div>
+<div id="authLoginForm">
+<input id="authUser" class="auth-input" placeholder="用户名" maxlength="12" autocomplete="username">
+<input id="authPass" class="auth-input" type="password" placeholder="密码" maxlength="64" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuthSubmit()">
+</div>
+<div id="authRegForm" style="display:none">
+<input id="regUser" class="auth-input" placeholder="用户名（2-12位）" maxlength="12" autocomplete="username">
+<input id="regPass" class="auth-input" type="password" placeholder="密码（至少6位）" maxlength="64" autocomplete="new-password">
+<input id="regPass2" class="auth-input" type="password" placeholder="确认密码" maxlength="64" autocomplete="new-password" onkeydown="if(event.key==='Enter')doAuthSubmit()">
+<p style="font-size:11px;color:#8b7355;margin:4px 0 0">注册后用「用户名」作为对局昵称，并继承本机游客战绩。</p>
+</div>
+<div id="authErr" style="color:#e74c3c;font-size:12px;min-height:16px;text-align:center"></div>
+<div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 26px" onclick="doAuthSubmit()">确定</button><button class="btn btn-outline" style="width:auto;padding:10px 26px" onclick="closeAuthModal()">取消</button></div>
 </div>
 </div>
 
@@ -6297,20 +6310,77 @@ box.style.display='';
 var lb=$id('loginBtn');if(lb)lb.style.display=p.name?'none':'';
 }
 window.openAuthModal=function(){
-var inp=$id('authNameInput');
-if(inp)inp.value=getName()||'';
+authErr('');
 var ov=$id('authOverlay');if(ov)ov.style.display='flex';
-setTimeout(function(){if(inp)inp.focus();},60);
+setTimeout(function(){var f=getAccount()?$id('authPass'):$id('authUser');if(f)f.focus();},60);
 };
 window.closeAuthModal=function(){var ov=$id('authOverlay');if(ov)ov.style.display='none';};
-window.saveAuthName=function(){
-var inp=$id('authNameInput');
-var n=inp?(inp.value||'').trim().slice(0,12):'';
-if(!n){toast('请输入昵称');return;}
-try{localStorage.setItem(NAME_KEY,n);}catch(e){}
-closeAuthModal();
+// ---------- 账号系统：用户名+密码，退出登录 ----------
+var AUTH_KEY='xq_account';
+function getAccount(){try{return localStorage.getItem(AUTH_KEY);}catch(e){return null;}}
+window.getAccount=getAccount;
+function authErr(m){var e=$id('authErr');if(e)e.textContent=m||'';}
+window.switchAuthTab=function(t){
+var lf=$id('authLoginForm'),rf=$id('authRegForm'),tl=$id('tabLogin'),tr=$id('tabReg');
+if(!lf||!rf)return;
+if(t==='login'){lf.style.display='';rf.style.display='none';tl.classList.add('active');tr.classList.remove('active');}
+else{lf.style.display='none';rf.style.display='';tl.classList.remove('active');tr.classList.add('active');}
+authErr('');
+};
+window.doAuthSubmit=function(){
+if($id('authLoginForm').style.display==='none'){doRegister();}else{doLogin();}
+};
+function setAuthBusy(b){var btns=document.querySelectorAll('#authOverlay .btn-green');for(var i=0;i<btns.length;i++)btns[i].disabled=b;}
+function doLogin(){
+var u=($id('authUser').value||'').trim(),p=$id('authPass').value||'';
+if(!u||!p){authErr('请输入用户名和密码');return;}
+authErr('');setAuthBusy(true);
+api('/api/auth/login',{method:'POST',body:JSON.stringify({username:u,password:p})}).then(function(r){
+setAuthBusy(false);
+if(r&&r.ok){closeAuthModal();window._xqSwitchToAccount(r.username);toast('✅ 欢迎回来，'+r.username+'！Elo '+((r.player&&r.player.elo)||1200),2400);}
+else{authErr((r&&r.error)||'登录失败');}
+}).catch(function(){setAuthBusy(false);authErr('网络异常，请重试');});
+}
+function doRegister(){
+var u=($id('regUser').value||'').trim(),p=$id('regPass').value||'',p2=$id('regPass2').value||'';
+if(!u){authErr('请输入用户名');return;}
+if(!p||p.length<6){authErr('密码至少6位');return;}
+if(p!==p2){authErr('两次密码不一致');return;}
+authErr('');setAuthBusy(true);
+api('/api/auth/register',{method:'POST',body:JSON.stringify({username:u,password:p,deviceId:getDev()})}).then(function(r){
+setAuthBusy(false);
+if(r&&r.ok){closeAuthModal();window._xqSwitchToAccount(r.username);toast((r.player&&r.player.games>0)?('✅ 注册成功，已继承本机战绩 Elo '+r.player.elo):('✅ 注册成功，欢迎 '+r.username+'！'),2600);}
+else{authErr((r&&r.error)||'注册失败');}
+}).catch(function(){setAuthBusy(false);authErr('网络异常，请重试');});
+}
+window._xqSwitchToAccount=function(username){
+try{
+var cur=getDev();
+if(!/^U:/.test(cur)){try{localStorage.setItem('xq_guest_device_id',cur);}catch(e){}}
+try{localStorage.setItem(DEV_KEY,'U:'+username);}catch(e){}
+try{localStorage.setItem(NAME_KEY,username);}catch(e){}
+try{localStorage.setItem(AUTH_KEY,username);}catch(e){}
+window._xqProfile=null;
+}catch(e){}
 registerProfile();
-toast('✅ 已注册，昵称: '+n,2000);
+};
+window._xqLogout=function(){
+try{localStorage.removeItem(AUTH_KEY);localStorage.removeItem(NAME_KEY);}catch(e){}
+try{
+var g=localStorage.getItem('xq_guest_device_id');
+if(g&&g.indexOf('U:')!==0){localStorage.setItem(DEV_KEY,g);}else{localStorage.setItem(DEV_KEY,'D'+Math.random().toString(36).slice(2,10)+Date.now().toString(36));}
+localStorage.removeItem('xq_guest_device_id');
+}catch(e){}
+window._xqProfile=null;
+try{var box=$id('profileBox');if(box)box.style.display='none';var lb=$id('loginBtn');if(lb)lb.style.display='';}catch(e){}
+toast('已退出登录',2000);
+};
+window._xqConfirmLogout=function(){
+showOverlay('<h2>退出登录</h2><p>退出后回到游客身份，账号战绩保留在服务器，下次登录恢复。</p><div class="btns2"><button class="btn btn-red" style="width:auto;padding:10px 26px" onclick="hideOverlay();window._xqLogout()">退出登录</button><button class="btn btn-outline" style="width:auto;padding:10px 26px" onclick="hideOverlay()">取消</button></div>');
+};
+window.profileChipClick=function(){
+if(getAccount()){window._xqConfirmLogout();}
+else{window.openAuthModal();}
 };
 window.editPlayerName=window.openAuthModal;
 function registerProfile(){

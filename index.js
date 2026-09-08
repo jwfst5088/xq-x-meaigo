@@ -75,6 +75,29 @@ async function upsertPlayer(db, deviceId, name) {
   }
 }
 __name(upsertPlayer, "upsertPlayer");
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: 100000 }, key, 256);
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+__name(hashPassword, "hashPassword");
+let _authSchemaReady = false;
+async function ensureAuthSchema(db) {
+  if (!db || _authSchemaReady) return;
+  try {
+    await db.prepare("CREATE TABLE IF NOT EXISTS user_auth (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, pass_salt TEXT NOT NULL, created_at INTEGER)").run();
+    _authSchemaReady = true;
+  } catch (e) {
+  }
+}
+__name(ensureAuthSchema, "ensureAuthSchema");
+function randomSalt() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+__name(randomSalt, "randomSalt");
 async function applyEloResult(db, roomId, red, black, result, reason, moveCount) {
   if (!db || !red || !black || !red.dev || !black.dev || red.dev === black.dev) return null;
   if (!["red", "black", "draw"].includes(result)) return null;
@@ -1130,6 +1153,63 @@ async function handleApiRequest(request, env) {
     return new Response(null, { headers: corsHeaders });
   }
   const json = (obj, status) => new Response(JSON.stringify(obj), { status: status || 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  if (path === "/api/auth/register" && request.method === "POST") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureAuthSchema(env.CHESS_DB);
+    await ensureRatingTables(env.CHESS_DB);
+    try {
+      const body = await request.json();
+      const username = body.username ? String(body.username).trim() : "";
+      const password = body.password ? String(body.password) : "";
+      if (!/^[A-Za-z0-9_\u4e00-\u9fa5]{2,12}$/.test(username)) return json({ ok: false, error: "用户名需2-12位（中文/字母/数字/下划线）" }, 400);
+      if (password.length < 6 || password.length > 64) return json({ ok: false, error: "密码需6-64位" }, 400);
+      const exists = await env.CHESS_DB.prepare("SELECT username FROM user_auth WHERE username = ?").bind(username).first();
+      if (exists) return json({ ok: false, error: "用户名已被注册" }, 409);
+      const salt = randomSalt();
+      const hash = await hashPassword(password, salt);
+      await env.CHESS_DB.prepare("INSERT INTO user_auth (username, pass_hash, pass_salt, created_at) VALUES (?, ?, ?, ?)").bind(username, hash, salt, Date.now()).run();
+      // 账号身份键：U:用户名 —— Elo/战绩跟随账号而非设备
+      const accId = "U:" + username;
+      // 若当前设备已有战绩（游客试玩过），继承到账号
+      let seeded = null;
+      if (body.deviceId && body.deviceId !== accId) {
+        try {
+          seeded = await env.CHESS_DB.prepare("SELECT elo, games, wins, losses, draws FROM players WHERE device_id = ?").bind(String(body.deviceId).slice(0, 64)).first();
+        } catch (e2) {
+          seeded = null;
+        }
+      }
+      const now = Date.now();
+      if (seeded && seeded.games > 0) {
+        await env.CHESS_DB.prepare("INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, last_seen = excluded.last_seen").bind(accId, username, seeded.elo, seeded.games, seeded.wins, seeded.losses, seeded.draws || 0, now, now).run();
+      } else {
+        await upsertPlayer(env.CHESS_DB, accId, username);
+      }
+      const p = await env.CHESS_DB.prepare("SELECT * FROM players WHERE device_id = ?").bind(accId).first();
+      return json({ ok: true, username, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
+    } catch (e) {
+      return json({ ok: false, error: "注册失败，请重试" }, 500);
+    }
+  }
+  if (path === "/api/auth/login" && request.method === "POST") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureAuthSchema(env.CHESS_DB);
+    await ensureRatingTables(env.CHESS_DB);
+    try {
+      const body = await request.json();
+      const username = body.username ? String(body.username).trim() : "";
+      const password = body.password ? String(body.password) : "";
+      const row = await env.CHESS_DB.prepare("SELECT pass_hash, pass_salt FROM user_auth WHERE username = ?").bind(username).first();
+      if (!row) return json({ ok: false, error: "用户名不存在" }, 401);
+      const hash = await hashPassword(password, row.pass_salt);
+      if (hash !== row.pass_hash) return json({ ok: false, error: "密码错误" }, 401);
+      const accId = "U:" + username;
+      const p = await upsertPlayer(env.CHESS_DB, accId, username);
+      return json({ ok: true, username, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
+    } catch (e) {
+      return json({ ok: false, error: "登录失败，请重试" }, 500);
+    }
+  }
   if (path === "/api/player/register" && request.method === "POST") {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureRatingTables(env.CHESS_DB);
