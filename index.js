@@ -969,6 +969,25 @@ var MatchQueue = class {
     this.env = env;
     this.queue = [];
     this.pairings = /* @__PURE__ */ new Map();
+    this._loaded = false;
+  }
+  async _ensureLoaded() {
+    if (this._loaded) return;
+    this._loaded = true;
+    try {
+      const q = await this.ctx.storage.get("queue");
+      if (Array.isArray(q)) this.queue = q;
+      const p = await this.ctx.storage.get("pairings");
+      if (Array.isArray(p)) this.pairings = new Map(p);
+    } catch (e) {
+    }
+  }
+  async _persist() {
+    try {
+      await this.ctx.storage.put("queue", this.queue);
+      await this.ctx.storage.put("pairings", [...this.pairings]);
+    } catch (e) {
+    }
   }
   async _tryPair() {
     const now = Date.now();
@@ -1012,10 +1031,13 @@ var MatchQueue = class {
     }
   }
   async alarm() {
+    await this._ensureLoaded();
     await this._tryPair();
     await this._scheduleSweep();
+    await this._persist();
   }
   async fetch(request) {
+    await this._ensureLoaded();
     const url = new URL(request.url);
     const path = url.pathname;
     if (path === "/join" && request.method === "POST") {
@@ -1024,10 +1046,13 @@ var MatchQueue = class {
         if (!body || !body.deviceId) return Response.json({ ok: false, error: "deviceId required" });
         const ticket = Math.random().toString(36).slice(2) + Date.now().toString(36);
         const elo = Number.isFinite(body.elo) ? Math.round(body.elo) : 1200;
-        this.queue = this.queue.filter((e) => e.deviceId !== body.deviceId);
+        // 同一设备最多保留3条排队（允许同机多窗口互相匹配，同时防刷）
+        const devCount = this.queue.filter((e) => e.deviceId === body.deviceId).length;
+        if (devCount >= 3) this.queue = this.queue.filter((e) => e.deviceId !== body.deviceId);
         this.queue.push({ ticket, deviceId: String(body.deviceId).slice(0, 64), name: body.name ? String(body.name).slice(0, 24) : null, elo, ts: Date.now() });
         await this._tryPair();
         await this._scheduleSweep();
+        await this._persist();
         return Response.json({ ok: true, ticket });
       } catch (e) {
         return Response.json({ ok: false, error: "bad request" }, { status: 400 });
@@ -1038,15 +1063,17 @@ var MatchQueue = class {
       const p = ticket && this.pairings.get(ticket);
       if (p) {
         this.pairings.delete(ticket);
+        await this._persist();
         return Response.json({ ok: true, state: "paired", roomId: p.data.roomId, color: p.data.color, oppName: p.data.oppName, oppElo: p.data.oppElo });
       }
       const still = ticket && this.queue.some((e) => e.ticket === ticket);
-      return Response.json({ ok: true, state: still ? "waiting" : "none" });
+      return Response.json({ ok: true, state: still ? "waiting" : "none", queueSize: this.queue.length });
     }
     if (path === "/cancel" && request.method === "POST") {
       try {
         const body = await request.json();
         this.queue = this.queue.filter((e) => e.ticket !== body.ticket);
+        await this._persist();
         return Response.json({ ok: true });
       } catch (e) {
         return Response.json({ ok: false }, { status: 400 });

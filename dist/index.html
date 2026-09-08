@@ -6395,6 +6395,15 @@ return;
 api('/api/match/status?ticket='+encodeURIComponent(_matchTicket)).then(function(r){
 if(!_matching)return;
 if(r&&r.state==='paired'){_matching=false;_matchTicket=null;resetMatchBtn();toast('🎯 已匹配对手，进入对局!',2000);enterMatchRoom(r.roomId);return;}
+if(r&&r.state==='none'){
+// 票据失效（服务重启/超时清理）：自动重新排队
+api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityFields())}).then(function(r2){
+if(_matching&&r2&&r2.ok){_matchTicket=r2.ticket;_matchTimer=setTimeout(pollMatch,1200);}
+else if(_matching){_matchTimer=setTimeout(pollMatch,2500);}
+}).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
+return;
+}
+if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s · 排队'+((r&&r.queueSize)||1)+'人'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
 _matchTimer=setTimeout(pollMatch,2000);
 }).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
 }
