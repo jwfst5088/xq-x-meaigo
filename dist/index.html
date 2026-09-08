@@ -123,60 +123,122 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
   .right-panel .actions .btn{width:100%;font-size:14px;padding:10px 14px}
   .right-panel .fs-btn{font-size:16px;padding:6px 16px;flex-shrink:0}
 }
+
+/* ===== 游戏首页布局（天天象棋风格）===== */
+#lobby{padding:0;gap:0;justify-content:flex-start;background:radial-gradient(1100px 520px at 50% -8%,#3a2417 0%,#251610 55%,#1a0f0a 100%);overflow-y:auto}
+.lb-top{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1200px;margin:0 auto;padding:12px 20px;box-sizing:border-box;border-bottom:1px solid rgba(90,58,40,.4);flex-shrink:0}
+.lb-brand{display:flex;align-items:center;gap:10px}
+.lb-brand .logo{font-size:32px}
+.lb-brand .title{font-size:22px;letter-spacing:4px}
+.lb-brand .sub{font-size:11px;color:#8b7355;letter-spacing:1px}
+.user-area{display:flex;align-items:center}
+.auth-btn{background:linear-gradient(135deg,#d4a843,#b8860b);color:#241610;border:none;border-radius:20px;padding:9px 20px;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:1px;font-family:inherit}
+.auth-btn:active{transform:scale(.96)}
+.user-chip{display:flex;align-items:center;gap:8px;background:#2c1810;border:1px solid #5a3a28;border-radius:30px;padding:5px 16px 5px 6px;cursor:pointer}
+.user-chip:hover{border-color:#d4a843}
+.uc-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#c0392b,#e74c3c);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;flex-shrink:0}
+.uc-name{font-size:13px;font-weight:800;color:#d4a843;white-space:nowrap}
+.uc-name i{font-style:normal;font-size:10px;color:#8b7355;font-weight:600;margin-left:4px}
+.uc-stats{font-size:11px;color:#8b7355}
+.uc-stats b{color:#2ecc71}
+.lb-body{display:flex;flex-direction:column;flex:1;width:100%;align-items:center}
+.lb-main{flex:1;width:100%;max-width:720px;padding:30px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:20px;box-sizing:border-box}
+.hero-slogan{font-size:15px;color:#c4a882;letter-spacing:8px}
+.match-cta{background:linear-gradient(135deg,#e67e22,#d35400);color:#fff;border:none;border-radius:18px;padding:20px 70px;font-size:24px;font-weight:900;letter-spacing:5px;cursor:pointer;box-shadow:0 8px 24px rgba(230,126,34,.35);font-family:inherit;transition:transform .1s}
+.match-cta:active{transform:scale(.97)}
+.match-cta.matching{background:linear-gradient(135deg,#c0392b,#a93226);animation:matchPulse 1.6s infinite}
+@keyframes matchPulse{0%,100%{box-shadow:0 8px 24px rgba(192,57,43,.35)}50%{box-shadow:0 8px 36px rgba(192,57,43,.65)}}
+.hero-hint{font-size:12px;color:#8b7355;margin-top:-12px}
+.join-grid{width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px}
+.join-grid .join input{flex:1;min-width:0}
+.lb-main .status{margin-top:-8px}
+.lb-main .online-count{margin-top:-12px}
+.mode-cards{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+.mode-card{background:#2c1810;border:1px solid #5a3a28;border-radius:14px;padding:18px 14px;min-width:140px;max-width:190px;flex:1;cursor:pointer;text-align:center;transition:border-color .2s,transform .1s}
+.mode-card:hover{border-color:#d4a843}
+.mode-card:active{transform:scale(.97)}
+.mc-icon{font-size:30px}
+.mc-name{font-size:15px;font-weight:800;color:#f0e6d3;margin-top:8px;letter-spacing:1px}
+.mc-desc{font-size:11px;color:#8b7355;margin-top:4px}
+.lb-side{display:none;width:100%;max-width:520px;background:#2c1810;border:1px solid #5a3a28;border-radius:14px;padding:14px;box-sizing:border-box;margin:0 20px 30px}
+.lb-side.open{display:block}
+.side-head{display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:800;color:#d4a843;letter-spacing:2px}
+.side-close{background:transparent;border:none;color:#8b7355;font-size:15px;cursor:pointer;padding:2px 6px}
+.side-list{margin-top:10px;font-size:12px;max-height:320px;overflow-y:auto}
+.side-note{margin-top:10px;font-size:11px;color:#5a4a3a;line-height:1.7;border-top:1px solid #3d2117;padding-top:8px}
+#lobby .footer{width:100%;text-align:center;margin-top:auto;padding:10px}
+.auth-input{width:100%;padding:12px;border:2px solid #5a3a28;border-radius:10px;background:#1a0f0a;color:#f0e6d3;font-size:15px;outline:none;margin:10px 0 14px;box-sizing:border-box;font-family:inherit}
+.auth-input:focus{border-color:#d4a843}
+@media(min-width:1000px){
+.lb-body{flex-direction:row;align-items:flex-start;max-width:1240px;margin:0 auto;gap:24px;padding:0 20px;box-sizing:border-box}
+.lb-main{padding-top:46px}
+.lb-side{display:block;width:330px;flex-shrink:0;margin:46px 0 30px;position:sticky;top:16px}
+.lb-side .side-close{display:none}
+#lbToggle{display:none}
+}
+@media(max-width:500px){.match-cta{padding:16px 42px;font-size:19px}.lb-brand .title{font-size:18px}.lb-brand .sub{display:none}.mode-card{min-width:100px;padding:14px 8px}}
 </style>
 </head>
 <body>
 <div id="app">
 <div id="lobby">
-<div class="logo">♚</div>
-<div class="title">中国象棋</div>
-<div class="sub">在线对弈平台</div>
-<div class="btns">
-<button class="btn btn-green" onclick="startAiGame()">  人机对弈</button>
-<button class="btn btn-blue" onclick="startPikafishGame()">🤖 Pikafish深度AI</button>
-
-		<div id="trainPanel" style="background:#1a0f0a;border-radius:8px;padding:10px 14px;margin:0 0 8px 0;border:1px solid #3d2117;text-align:left">
-		<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-		<span style="color:#2ecc71;font-size:13px;font-weight:700">⚡ AI快速训练</span>
-		<button id="trainStartBtn" class="btn btn-outline" style="width:auto;padding:3px 10px;font-size:11px;background:#2ecc71;color:#fff;border-color:#27ae60" onclick="startAiTraining()">开始训练</button>
-		<button id="trainStopBtn" class="btn btn-red" style="width:auto;padding:3px 10px;font-size:11px;display:none" onclick="stopAiTraining()">停止训练</button>
-		</div>
-		<div style="font-size:11px;color:#8b7355;line-height:1.6" id="trainStats">累计训练：0局 | 红胜0 黑胜0 和棋0</div>
-		<div id="trainSessionStats" style="display:none;font-size:12px;color:#c4a882;line-height:1.6;margin-top:2px">
-		本局 <b style="color:#2ecc71" id="trainGames">0</b> 局 |
-		红胜 <b style="color:#e74c3c" id="trainRedWins">0</b> |
-		黑胜 <b id="trainBlkWins" style="color:#aaa">0</b> |
-		和棋 <b style="color:#f39c12" id="trainDraws">0</b>
-		</div>
-		</div>
-	<div class="divider">在线对战</div>
-<div class="join">
-<input id="createInput" placeholder="留空自动生成房间号" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')createRoom()">
-<button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="createRoom()">创建</button>
+<div class="lb-top">
+<div class="lb-brand"><span class="logo">♚</span><span class="title">中国象棋</span><span class="sub">在线对弈平台</span></div>
+<div class="user-area">
+<button id="loginBtn" class="auth-btn" onclick="openAuthModal()">登录 / 注册</button>
+<div id="profileBox" class="user-chip" style="display:none" onclick="openAuthModal()" title="点击修改昵称">
+<div class="uc-avatar" id="ucAvatar">客</div>
+<div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div><div class="uc-stats">Elo <b id="pfElo">1200</b> · <span id="pfRecord">0胜 0和 0负</span></div></div>
 </div>
-<div class="join">
-<input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()">
-<button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入</button>
 </div>
-<div id="matchBox" style="margin-top:10px">
-<button id="matchBtn" class="btn btn-orange" style="background:#e67e22;border-color:#d35400;color:#fff;font-weight:700" onclick="quickMatch()">⚡ 快速匹配</button>
-<div id="matchHint" style="font-size:11px;color:#8b7355;margin-top:4px">按等级分自动配对手工房间</div>
 </div>
-<div id="profileBox" style="background:#1a0f0a;border-radius:8px;padding:8px 12px;margin:10px 0 0 0;border:1px solid #3d2117;text-align:left;display:none">
-<div style="display:flex;justify-content:space-between;align-items:center">
-<span style="font-size:13px;color:#d4a843;font-weight:700">👤 <span id="pfName">游客</span> <span id="pfTitle" style="font-size:11px;color:#8b7355"></span></span>
-<button class="btn btn-outline" style="width:auto;padding:2px 8px;font-size:11px" onclick="editPlayerName()">改名</button>
-</div>
-<div style="font-size:12px;color:#8b7355;margin-top:2px">Elo <b style="color:#2ecc71" id="pfElo">1200</b> · <span id="pfRecord">0胜 0和 0负</span></div>
-</div>
-<div id="lbBox" style="margin-top:10px">
-<button id="lbToggle" class="btn btn-outline" style="width:auto;padding:6px 14px;font-size:13px" onclick="toggleLeaderboard()">🏆 排行榜</button>
-<div id="lbList" style="display:none;background:#1a0f0a;border-radius:8px;padding:8px 10px;margin-top:6px;border:1px solid #3d2117;text-align:left;max-height:260px;overflow-y:auto;font-size:12px"></div>
-</div>
+<div class="lb-body">
+<div class="lb-main">
+<div class="hero-slogan">对 弈 · 竞 技 · 升 段</div>
+<button id="matchBtn" class="match-cta" onclick="quickMatch()">⚡ 快速匹配</button>
+<div id="matchHint" class="hero-hint">按等级分自动配对 · 段位对战 · 60秒未匹配可取消</div>
+<div class="join-grid">
+<div class="join"><input id="createInput" placeholder="留空自动生成房间号" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')createRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="createRoom()">创建房间</button></div>
+<div class="join"><input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入房间</button></div>
 </div>
 <div class="status" id="lobbyStatus"></div>
 <div class="online-count" id="onlineCount">当前在线: - 人</div>
+<div class="mode-cards">
+<div class="mode-card" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈</div><div class="mc-desc">入门练习 · 不计分</div></div>
+<div class="mode-card" onclick="startPikafishGame()"><div class="mc-icon">🧠</div><div class="mc-name">Pikafish 深度AI</div><div class="mc-desc">专业引擎 · 高强度</div></div>
+<div class="mode-card" onclick="toggleTrainPanel()"><div class="mc-icon">⚙️</div><div class="mc-name">AI快速训练</div><div class="mc-desc" id="trainStats">累计训练：0局</div></div>
+</div>
+<div id="trainPanel" style="display:none;background:#1a0f0a;border-radius:10px;padding:10px 14px;border:1px solid #3d2117;text-align:left;width:100%;max-width:520px;box-sizing:border-box">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
+<span style="color:#2ecc71;font-size:13px;font-weight:700">⚡ AI自动对局训练</span>
+<span><button id="trainStartBtn" class="btn btn-outline" style="width:auto;padding:3px 10px;font-size:11px;background:#2ecc71;color:#fff;border-color:#27ae60" onclick="startAiTraining()">开始训练</button>
+<button id="trainStopBtn" class="btn btn-red" style="width:auto;padding:3px 10px;font-size:11px;display:none" onclick="stopAiTraining()">停止训练</button></span>
+</div>
+<div id="trainSessionStats" style="display:none;font-size:12px;color:#c4a882;line-height:1.6;margin-top:2px">
+本局 <b style="color:#2ecc71" id="trainGames">0</b> 局 |
+红胜 <b style="color:#e74c3c" id="trainRedWins">0</b> |
+黑胜 <b id="trainBlkWins" style="color:#aaa">0</b> |
+和棋 <b id="trainDraws" style="color:#f39c12">0</b>
+</div>
+</div>
+<button id="lbToggle" class="btn btn-outline" style="width:auto;padding:6px 14px;font-size:13px" onclick="toggleLeaderboard()">🏆 排行榜</button>
+</div>
+<aside class="lb-side" id="lbSide">
+<div class="side-head"><span>🏆 天梯排行榜</span><button class="side-close" onclick="toggleLeaderboard()">✕</button></div>
+<div id="lbList" class="side-list"></div>
+<div class="side-note">段位：业余六级 → 业余五级 → … → 业余一级 → 地区大师 → 特级大师<br>等级分初始 1200，在线对战自动升降，AI 对局不计分</div>
+</aside>
+</div>
 <div class="footer" id="footerText">人机对弈需联网 | 在线模式两人对战</div>
+</div>
+
+<div class="overlay" id="authOverlay" style="display:none">
+<div class="box" style="text-align:left;max-width:320px">
+<h2 style="text-align:center">登录 / 注册</h2>
+<p style="text-align:left">无需密码：设备号自动创建账号。设置昵称后即可参与段位对战、等级分结算与排行榜。</p>
+<input id="authNameInput" class="auth-input" placeholder="输入昵称（最多12字）" maxlength="12" onkeydown="if(event.key==='Enter')saveAuthName()">
+<div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 26px" onclick="saveAuthName()">确认</button><button class="btn btn-outline" style="width:auto;padding:10px 26px" onclick="closeAuthModal()">取消</button></div>
+</div>
 </div>
 
 <div id="game">
@@ -6219,19 +6281,32 @@ function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return nu
 window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||null,elo:(p&&p.elo)?p.elo:1200};};
 function renderProfile(p){
 var box=$id('profileBox');if(!box||!p)return;
-$id('pfName').textContent=p.name||('棋手'+p.deviceId.slice(-4));
+var nm=p.name||('棋手'+p.deviceId.slice(-4));
+$id('pfName').textContent=nm;
 $id('pfTitle').textContent=p.title||'';
 $id('pfElo').textContent=p.elo;
 $id('pfRecord').textContent=(p.wins||0)+'胜 '+(p.draws||0)+'和 '+(p.losses||0)+'负';
+$id('ucAvatar').textContent=(nm||'客').charAt(0).toUpperCase();
 box.style.display='';
+var lb=$id('loginBtn');if(lb)lb.style.display=p.name?'none':'';
 }
-window.editPlayerName=function(){
-var n=prompt('输入昵称（最多12字）',getName()||'');if(n===null)return;
-n=(n||'').trim().slice(0,12);if(!n)return;
-try{localStorage.setItem(NAME_KEY,n);}catch(e){}
-registerProfile();
-toast('昵称已更新: '+n,1500);
+window.openAuthModal=function(){
+var inp=$id('authNameInput');
+if(inp)inp.value=getName()||'';
+var ov=$id('authOverlay');if(ov)ov.style.display='flex';
+setTimeout(function(){if(inp)inp.focus();},60);
 };
+window.closeAuthModal=function(){var ov=$id('authOverlay');if(ov)ov.style.display='none';};
+window.saveAuthName=function(){
+var inp=$id('authNameInput');
+var n=inp?(inp.value||'').trim().slice(0,12):'';
+if(!n){toast('请输入昵称');return;}
+try{localStorage.setItem(NAME_KEY,n);}catch(e){}
+closeAuthModal();
+registerProfile();
+toast('✅ 已注册，昵称: '+n,2000);
+};
+window.editPlayerName=window.openAuthModal;
 function registerProfile(){
 api('/api/player/register',{method:'POST',body:JSON.stringify({deviceId:getDev(),name:getName()||null})})
 .then(function(r){if(r&&r.player){window._xqProfile=r.player;renderProfile(r.player);}}).catch(function(){});
@@ -6260,9 +6335,9 @@ window.connectSocket=function(){_origConnectSocket();setTimeout(attachRatingHand
 
 // ---------- 排行榜 ----------
 window.toggleLeaderboard=function(){
-var lst=$id('lbList');if(!lst)return;
-if(lst.style.display==='none'){lst.style.display='';$id('lbToggle').textContent='🏆 收起排行榜';loadLeaderboard();}
-else{lst.style.display='none';$id('lbToggle').textContent='🏆 排行榜';}
+var side=$id('lbSide');if(!side)return;
+if(!side.classList.contains('open'))loadLeaderboard();
+side.classList.toggle('open');
 };
 function loadLeaderboard(){
 var lst=$id('lbList');if(!lst)return;
@@ -6279,6 +6354,13 @@ h+='</table>';
 lst.innerHTML=h;
 }).catch(function(){lst.innerHTML='<div style="color:#8b7355">加载失败</div>';});
 }
+if(window.innerWidth>=1000)loadLeaderboard();
+
+// ---------- 训练面板开关 ----------
+window.toggleTrainPanel=function(){
+var p=$id('trainPanel');if(!p)return;
+p.style.display=p.style.display==='none'?'':'none';
+};
 
 // ---------- 快速匹配 ----------
 var _matching=false,_matchTicket=null,_matchTimer=null,_matchStarted=0;
@@ -6291,7 +6373,7 @@ api('/api/match/join',{method:'POST',body:JSON.stringify(window._xqIdentityField
 if(!r||!r.ok){_matching=false;resetMatchBtn();toast(r&&r.error?r.error:'匹配服务不可用');return;}
 _matchTicket=r.ticket;
 var btn=$id('matchBtn');
-if(btn){btn.textContent='⏳ 匹配中… (点击取消)';btn.style.background='#c0392b';btn.style.borderColor='#a93226';}
+if(btn){btn.textContent='⏳ 匹配中… 点击取消';btn.classList.add('matching');}
 pollMatch();
 }).catch(function(){_matching=false;resetMatchBtn();toast('匹配服务不可用');});
 };
@@ -6312,7 +6394,7 @@ resetMatchBtn();
 }
 function resetMatchBtn(){
 var btn=$id('matchBtn');
-if(btn){btn.textContent='⚡ 快速匹配';btn.style.background='#e67e22';btn.style.borderColor='#d35400';}
+if(btn){btn.textContent='⚡ 快速匹配';btn.classList.remove('matching');}
 }
 function enterMatchRoom(roomId){
 try{localStorage.setItem('xq_last_color','');}catch(e){}
