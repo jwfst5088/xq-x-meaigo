@@ -1175,7 +1175,7 @@ var MatchQueue = class {
         if (Math.abs(a.elo - b.elo) <= tol) {
           pairedTickets.add(a.ticket);
           pairedTickets.add(b.ticket);
-          const roomId = String(Math.floor(1000 + Math.random() * 9000));
+          const roomId = await generateFreeRoomId(this.env.CHESS_DB);
           const redIsA = Math.random() < 0.5;
           this._log("pair", (a.name || "?") + " vs " + (b.name || "?") + " room=" + roomId);
           this.pairings.set(a.ticket, { data: { roomId, color: redIsA ? "red" : "black", oppName: b.name || null, oppElo: b.elo || null, rated: true }, ts: now });
@@ -1583,7 +1583,7 @@ async function handleApiRequest(request, env) {
   }
   if (path === "/api/create-room") {
     const customId = url.searchParams.get("id");
-    const roomId = customId || String(Math.floor(1000 + Math.random() * 9000));
+    const roomId = customId || (await generateFreeRoomId(env.CHESS_DB));
     return new Response(JSON.stringify({ roomId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
   return new Response(JSON.stringify({ error: "Not found" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
@@ -1634,8 +1634,22 @@ var index_default = {
     return new Response("Not found", { status: 404 });
   }
 };
-async function presenceDelta(env, delta) {
-  try {
+// 生成未被占用(在线对局中)的4位房间号; 查room_state存档表, 对局中房间必有行, 结束即删
+async function generateFreeRoomId(db) {
+  for (let i = 0; i < 24; i++) {
+    const id = String(Math.floor(1000 + Math.random() * 9000));
+    try {
+      if (!db) return id;
+      const row = await db.prepare("SELECT 1 FROM room_state WHERE room_id = ?").bind(id).first();
+      if (!row) return id;
+    } catch (e) {
+      return id;
+    }
+  }
+  return String(Date.now()).slice(-6);
+}
+__name(generateFreeRoomId, "generateFreeRoomId");
+async function presenceDelta(env, delta) {  try {
     const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
     const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta }) });
     const d = await r.json();
@@ -1669,7 +1683,7 @@ async function handleWebSocket(ws, env) {
         } else {
           requestedRoomId = payload;
         }
-        const roomId = requestedRoomId || String(Math.floor(1000 + Math.random() * 9000));
+        const roomId = requestedRoomId || (await generateFreeRoomId(this.env.CHESS_DB));
         ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
       } else if (eventName === "ping") {
         try {
