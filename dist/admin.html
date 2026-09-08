@@ -109,7 +109,7 @@ function render() {
       + "<td>" + p.wins + "/" + p.losses + "/" + p.draws + "</td>"
       + "<td class=\"mut\" style=\"max-width:220px;word-break:break-all\">" + esc(id) + "</td>"
       + "<td class=\"mut\">" + (p.last_seen ? new Date(p.last_seen).toLocaleString() : "-") + "</td>"
-      + "<td><button class=\"save\" onclick=\"save(" + i + ")\">保存</button> <button class=\"save\" style=\"border-color:#e74c3c;color:#e74c3c\" onclick=\"del(" + i + ")\">删除</button></td>"
+      + "<td><button class=\"save\" onclick=\"save(" + i + ")\">保存</button> <button class=\"save\" onclick=\"rp(" + i + ")\">改密</button> <button class=\"save\" style=\"border-color:#e74c3c;color:#e74c3c\" onclick=\"del(" + i + ")\">删除</button></td>"
       + "</tr>";
   });
   rows.innerHTML = h || '<tr><td colspan="8" class="mut">无匹配玩家</td></tr>';
@@ -127,6 +127,17 @@ function save(i) {
     } else {
       m.textContent = "✘ " + ((r && r.error) || "失败");
     }
+  }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
+}
+function rp(i) {
+  var p = DATA[i];
+  if (!p.deviceId || p.deviceId.indexOf("U:") !== 0) { document.getElementById("msg").textContent = "✘ 该玩家是游客，无账号密码"; return; }
+  var np = prompt("为账号「" + p.deviceId.slice(2) + "」设置新密码（6~64位）：\n（密码加密存储，无法查看原密码，只能重置）", "");
+  if (np == null) return;
+  if (np.length < 6 || np.length > 64) { document.getElementById("msg").textContent = "✘ 密码需6~64位"; return; }
+  api("/api/admin/resetPassword", { token: TOKEN, username: p.deviceId.slice(2), newPassword: np }).then(function (r) {
+    var m = document.getElementById("msg");
+    m.textContent = (r && r.ok) ? "✔ 已重置 " + r.username + " 的密码" : "✘ " + ((r && r.error) || "失败");
   }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
 }
 function del(i) {

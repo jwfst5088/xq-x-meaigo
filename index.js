@@ -1382,6 +1382,23 @@ async function handleApiRequest(request, env) {
       return json({ ok: false, error: "删除失败" }, 500);
     }
   }
+  if (path === "/api/admin/resetPassword" && request.method === "POST" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureAuthSchema(env.CHESS_DB);
+    try {
+      const b = await request.json();
+      const username = b && b.username ? String(b.username).slice(0, 12) : null;
+      const np = b && typeof b.newPassword === "string" ? b.newPassword : null;
+      if (!username || !np || np.length < 6 || np.length > 64) return json({ ok: false, error: "新密码需6~64位" }, 400);
+      const salt = randomSalt();
+      const hash = await hashPassword(np, salt);
+      const r = await env.CHESS_DB.prepare("UPDATE user_auth SET pass_hash = ?, pass_salt = ? WHERE username = ?").bind(hash, salt, username).run();
+      if (!r.success || r.meta.changes === 0) return json({ ok: false, error: "该玩家不是账号（游客无密码）" }, 404);
+      return json({ ok: true, username });
+    } catch (e) {
+      return json({ ok: false, error: "重置失败" }, 500);
+    }
+  }
   if (path === "/api/admin/players") return json({ ok: false, error: "未登录" }, 401);
   if (path === "/api/match/debug" && env.MATCH_QUEUE) {
     try {
