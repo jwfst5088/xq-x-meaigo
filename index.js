@@ -1043,6 +1043,7 @@ var MatchQueue = class {
     this.pairings = /* @__PURE__ */ new Map();
     this._loaded = false;
     this.events = [];
+    this.online = 0;
   }
   _log(ev, detail) {
     try {
@@ -1159,6 +1160,19 @@ var MatchQueue = class {
         this._log("cancel", "left=" + this.queue.length);
         await this._persist();
         return Response.json({ ok: true });
+      } catch (e) {
+        return Response.json({ ok: false }, { status: 400 });
+      }
+    }
+    if (path === "/online") {
+      return Response.json({ ok: true, online: this.online || 0 });
+    }
+    if (path === "/presence" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const d = body && typeof body.delta === "number" ? body.delta : 0;
+        this.online = Math.max(0, (this.online || 0) + d);
+        return Response.json({ ok: true, online: this.online });
       } catch (e) {
         return Response.json({ ok: false }, { status: 400 });
       }
@@ -1290,6 +1304,67 @@ async function handleApiRequest(request, env) {
       return json({ error: "match unavailable" }, 503);
     }
   }
+  if (path === "/api/online" && env.MATCH_QUEUE) {
+    try {
+      const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
+      const resp = await stub.fetch("https://do/online");
+      return json(await resp.json());
+    } catch (e) {
+      return json({ ok: false, online: 0 });
+    }
+  }
+  async function adminToken(dayKey) {
+    const data = new TextEncoder().encode("xq-admin-123456-" + dayKey);
+    const buf = await crypto.subtle.digest("SHA-256", data);
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  const adminDayKey = new Date().toISOString().slice(0, 10);
+  const urlToken = url.searchParams.get("token") || null;
+  let bodyToken = null;
+  if (request.method === "POST") {
+    try {
+      const b = await request.clone().json();
+      if (b && typeof b.token === "string") bodyToken = b.token;
+    } catch (e) {
+    }
+  }
+  const token = bodyToken || urlToken;
+  const isAdmin = !!token && token === (await adminToken(adminDayKey));
+  if (path === "/api/admin/login" && request.method === "POST") {
+    try {
+      const b = await request.json();
+      if (b && b.password === "123456") return json({ ok: true, token: await adminToken(adminDayKey) });
+      return json({ ok: false, error: "密码错误" }, 401);
+    } catch (e) {
+      return json({ ok: false, error: "bad request" }, 400);
+    }
+  }
+  if (path === "/api/admin/players" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureRatingTables(env.CHESS_DB);
+    try {
+      const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws, created_at, last_seen FROM players ORDER BY last_seen DESC LIMIT 1000").all();
+      return json({ ok: true, list: (rows.results || []).map((r) => ({ deviceId: r.device_id, name: r.name, elo: r.elo, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, title: rankTitle(r.elo), created_at: r.created_at, last_seen: r.last_seen })) });
+    } catch (e) {
+      return json({ ok: false, error: "查询失败" }, 500);
+    }
+  }
+  if (path === "/api/admin/setScore" && request.method === "POST" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    try {
+      const b = await request.json();
+      const dev = b && b.deviceId ? String(b.deviceId).slice(0, 64) : null;
+      const sc = b && Number.isFinite(Number(b.score)) ? Math.round(Number(b.score)) : null;
+      if (!dev || sc === null) return json({ ok: false, error: "参数错误" }, 400);
+      const clamped = Math.max(-250, Math.min(7000, sc));
+      await env.CHESS_DB.prepare("UPDATE players SET elo = ? WHERE device_id = ?").bind(clamped, dev).run();
+      const p = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws FROM players WHERE device_id = ?").bind(dev).first();
+      return json({ ok: true, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
+    } catch (e) {
+      return json({ ok: false, error: "修改失败" }, 500);
+    }
+  }
+  if (path === "/api/admin/players") return json({ ok: false, error: "未登录" }, 401);
   if (path === "/api/match/debug" && env.MATCH_QUEUE) {
     try {
       const id = env.MATCH_QUEUE.idFromName("global");
@@ -1399,6 +1474,10 @@ var index_default = {
     if (path.startsWith("/api/")) {
       return await handleApiRequest(request, env);
     }
+    if (path === "/admin" || path === "/admin/") {
+      const adminReq = new Request(new URL("/admin.html", request.url).toString(), request);
+      return env.ASSETS.fetch(adminReq);
+    }
     if (request.headers.get("Upgrade") === "websocket") {
       const roomId = url.searchParams.get("roomId");
       if (!roomId) {
@@ -1431,9 +1510,24 @@ var index_default = {
     return new Response("Not found", { status: 404 });
   }
 };
+async function presenceDelta(env, delta) {
+  try {
+    const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
+    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta }) });
+    const d = await r.json();
+    return d && typeof d.online === "number" ? d.online : null;
+  } catch (e) {
+    return null;
+  }
+}
+__name(presenceDelta, "presenceDelta");
+
 async function handleWebSocket(ws, env) {
-  onlineCount++;
   activeConnections.add(ws);
+  const n = await presenceDelta(env, 1);
+  if (typeof n === "number") onlineCount = n;
+  else onlineCount++;
+  ws._presCounted = true;
   ws.send(JSON.stringify({ event: "online_count", data: onlineCount }));
   broadcastOnlineCount();
   let socketData = { roomId: null, color: null, spectator: false };
@@ -1470,16 +1564,20 @@ async function handleWebSocket(ws, env) {
       console.error("WebSocket message error:", e);
     }
   };
-  ws.onclose = () => {
-    onlineCount--;
+  const lobbyDetach = () => {
     activeConnections.delete(ws);
-    broadcastOnlineCount();
+    if (ws._presCounted) {
+      ws._presCounted = false;
+      presenceDelta(env, -1).then((n) => {
+        if (typeof n === "number") {
+          onlineCount = n;
+          broadcastOnlineCount();
+        }
+      }).catch(() => {});
+    }
   };
-  ws.onerror = () => {
-    onlineCount--;
-    activeConnections.delete(ws);
-    broadcastOnlineCount();
-  };
+  ws.onclose = lobbyDetach;
+  ws.onerror = lobbyDetach;
 }
 __name(handleWebSocket, "handleWebSocket");
 export {

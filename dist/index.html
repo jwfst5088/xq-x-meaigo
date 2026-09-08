@@ -197,7 +197,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <button id="loginBtn" class="auth-btn" onclick="openAuthModal()">登录 / 注册</button>
 <div id="profileBox" class="user-chip" style="display:none" onclick="profileChipClick()" title="点击管理账号">
 <div class="uc-avatar" id="ucAvatar">客</div>
-<div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div><div class="uc-stats">Elo <b id="pfElo">-160</b> · <span id="pfRecord">0胜 0和 0负</span></div></div>
+<div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div></div>
 </div>
 </div>
 </div>
@@ -205,17 +205,15 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="lb-main">
 <div class="hero-slogan">对 弈 · 竞 技 · 升 段</div>
 <button id="matchBtn" class="match-cta" onclick="quickMatch()">⚡ 快速匹配</button>
-<div id="matchHint" class="hero-hint">按棋力评分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分</div>
+<div id="matchHint" class="hero-hint">按棋力评分自动配对 · 30秒无人将自动匹配AI陪练 · AI对局不计分</div>
 <div class="join-grid">
 <div class="join"><input id="createInput" placeholder="留空自动生成房间号" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')createRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="createRoom()">创建房间</button></div>
 <div class="join"><input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入房间</button></div>
 </div>
-<div class="status" id="lobbyStatus"></div>
-<div class="online-count" id="onlineCount">当前在线: - 人</div>
 <div class="mode-cards">
-<div class="mode-card" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈</div><div class="mc-desc">入门练习 · 不计分</div></div>
-<div class="mode-card" onclick="startPikafishGame()"><div class="mc-icon">🧠</div><div class="mc-name">Pikafish 深度AI</div><div class="mc-desc">专业引擎 · 高强度</div></div>
-<div class="mode-card" onclick="toggleTrainPanel()"><div class="mc-icon">⚙️</div><div class="mc-name">AI快速训练</div><div class="mc-desc" id="trainStats">累计训练：0局</div></div>
+<div class="mode-card" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈初级</div><div class="mc-desc">入门练习 · 不计分</div></div>
+<div class="mode-card" onclick="startPikafishGame()"><div class="mc-icon">🧠</div><div class="mc-name">人机对弈高级</div><div class="mc-desc">专业引擎 · 高强度</div></div>
+<div class="mode-card" id="trainCard" style="display:none" onclick="toggleTrainPanel()"><div class="mc-icon">⚙️</div><div class="mc-name">AI快速训练</div><div class="mc-desc" id="trainStats">累计训练：0局</div></div>
 </div>
 <div id="trainPanel" style="display:none;background:#1a0f0a;border-radius:10px;padding:10px 14px;border:1px solid #3d2117;text-align:left;width:100%;max-width:520px;box-sizing:border-box">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
@@ -235,10 +233,9 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <aside class="lb-side" id="lbSide">
 <div class="side-head"><span>🏆 天梯排行榜</span><button class="side-close" onclick="toggleLeaderboard()">✕</button></div>
 <div id="lbList" class="side-list"></div>
-<div class="side-note">段位：学1-1(-160) → 业1-1(400) → 业4-2(1200) → 业9-3(3300) → 专3-3(7000封顶)<br>初始积分 -160（学徒1-1），同段胜+10平0负-10，在线对战自动升降，AI 对局不计分</div>
 </aside>
 </div>
-<div class="footer" id="footerText">人机对弈需联网 | 在线模式两人对战</div>
+<div class="footer"><div class="status" id="lobbyStatus"></div><div class="online-count" id="onlineCount">当前在线: - 人</div><div id="footerText">人机对弈需联网 | 在线模式两人对战</div></div>
 </div>
 
 <div class="overlay" id="authOverlay" style="display:none">
@@ -6303,8 +6300,6 @@ var box=$id('profileBox');if(!box||!p)return;
 var nm=p.name||('棋手'+p.deviceId.slice(-4));
 $id('pfName').textContent=nm;
 $id('pfTitle').textContent=p.title||'';
-$id('pfElo').textContent=p.elo;
-$id('pfRecord').textContent=(p.wins||0)+'胜 '+(p.draws||0)+'和 '+(p.losses||0)+'负';
 $id('ucAvatar').textContent=(nm||'客').charAt(0).toUpperCase();
 box.style.display='';
 var lb=$id('loginBtn');if(lb)lb.style.display=p.name?'none':'';
@@ -6388,6 +6383,19 @@ api('/api/player/register',{method:'POST',body:JSON.stringify({deviceId:getDev()
 .then(function(r){if(r&&r.player){window._xqProfile=r.player;renderProfile(r.player);}}).catch(function(){});
 }
 registerProfile();
+// 在线人数轮询（权威值来自服务器DO，10秒刷新）
+setInterval(function(){
+api('/api/online').then(function(r){
+var n=(r&&typeof r.online==='number')?r.online:null;
+var el=n!=null?$id('onlineCount'):null;
+if(el)el.textContent='当前在线: '+n+' 人';
+}).catch(function(){});
+},10000);
+// AI快速训练入口仅管理员可见（在 /admin 登录后写入标记）
+try{
+var tc=$id('trainCard');
+if(tc&&localStorage.getItem('xq_admin_token'))tc.style.display='';
+}catch(e){}
 
 // ---------- 等级分变更提示 + 座位名字显示 ----------
 function applySeatNames(si,myColor){
@@ -6450,10 +6458,10 @@ lst.innerHTML='<div style="color:#8b7355;padding:4px">加载中...</div>';
 api('/api/leaderboard').then(function(r){
 if(!r||!r.ok||!r.list||!r.list.length){lst.innerHTML='<div style="color:#8b7355;padding:6px">暂无数据，来一局在线对战上榜吧！</div>';return;}
 var h='<table style="width:100%;border-collapse:collapse">';
-h+='<tr style="color:#d4a843"><td style="padding:2px">#</td><td>棋手</td><td>段位</td><td>Elo</td><td>战绩</td></tr>';
+h+='<tr style="color:#d4a843"><td style="padding:2px">#</td><td>棋手</td><td>棋力分</td><td>战绩</td></tr>';
 r.list.forEach(function(p){
 var medal=p.rank===1?'🥇':p.rank===2?'🥈':p.rank===3?'🥉':p.rank;
-h+='<tr style="border-top:1px solid #3d2117"><td style="padding:3px 2px">'+medal+'</td><td>'+esc(p.name)+'</td><td style="color:#8b7355;font-size:11px">'+p.title+'</td><td style="color:#2ecc71;font-weight:700">'+p.elo+'</td><td style="color:#8b7355;font-size:11px">'+p.wins+'胜'+p.losses+'负'+(p.draws?'+'+p.draws:'')+'</td></tr>';
+h+='<tr style="border-top:1px solid #3d2117"><td style="padding:3px 2px">'+medal+'</td><td>'+esc(p.name)+'</td><td style="color:#2ecc71;font-weight:700">'+p.elo+'</td><td style="color:#8b7355;font-size:11px">'+p.wins+'胜'+p.losses+'负'+(p.draws?'+'+p.draws:'')+'</td></tr>';
 });
 h+='</table>';
 lst.innerHTML=h;
@@ -6498,11 +6506,11 @@ if(typeof gm!=='undefined'&&gm==='online'&&typeof myRm!=='undefined'&&myRm){canc
 var waited=Math.floor((Date.now()-_matchStarted)/1000);
 var btn=$id('matchBtn');
 if(btn&&waited>=2)btn.textContent='⏳ 匹配中… '+waited+'s'+(waited>=6?' · '+(15-waited)+'s后AI补位':'');
-// 15秒无人：看在线人数决定（≥2人在线继续等真人，40秒硬上限后AI补位）
-if(waited>=15){
+// 30秒无人：看在线人数决定（≥2人在线继续等真人，60秒硬上限后AI补位）
+if(waited>=30){
 var oc=(typeof D==='function'&&D('onlineCount'))?D('onlineCount').textContent:'';
 var om=parseInt((oc.match(/\d+/)||['1'])[0],10)||1;
-if(om>=2&&waited<40){_matchTimer=setTimeout(pollMatch,2000);return;}
+if(om>=2&&waited<60){_matchTimer=setTimeout(pollMatch,2000);return;}
 cancelMatch();
 toast('⚡ 当前在线较少，已为您匹配 AI 对手陪练',2800);
 if(typeof startAiGame==='function'){startAiGame();}
@@ -6519,7 +6527,7 @@ else if(_matching){_matchTimer=setTimeout(pollMatch,2500);}
 }).catch(function(){if(_matching)_matchTimer=setTimeout(pollMatch,2500);});
 return;
 }
-if(btn&&waited>=2){btn.textContent='⏳ 匹配中… '+waited+'s · 排队'+((r&&r.queueSize)||1)+'人'+(waited>=6?' · '+(waited<40?'AI补位倒计时':''):'');var hh=$id('matchHint');if(hh){hh.textContent='已入队 · 排队'+((r&&r.queueSize)||1)+'人 · 等待对手加入';hh.style.color='#c4a882';}}
+if(btn&&waited>=2){btn.textContent='⏳ 匹配中… '+waited+'s · 排队'+((r&&r.queueSize)||1)+'人'+(waited>=6?' · '+(waited<60?'AI补位倒计时':''):'');var hh=$id('matchHint');if(hh){hh.textContent='已入队 · 排队'+((r&&r.queueSize)||1)+'人 · 等待对手加入';hh.style.color='#c4a882';}}
 _matchTimer=setTimeout(pollMatch,2000);
 }).catch(function(e){if(_matching){var h4=$id('matchHint');if(h4){h4.textContent='⚠️ 轮询异常，重试中…';h4.style.color='#f39c12';}_matchTimer=setTimeout(pollMatch,2500);}});
 }
@@ -6532,7 +6540,7 @@ resetMatchBtn();
 function resetMatchBtn(){
 var btn=$id('matchBtn');
 if(btn){btn.textContent='⚡ 快速匹配';btn.classList.remove('matching');}
-var h=$id('matchHint');if(h){h.textContent='按棋力评分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分';h.style.color='';}
+var h=$id('matchHint');if(h){h.textContent='按棋力评分自动配对 · 30秒无人将自动匹配AI陪练 · AI对局不计分';h.style.color='';}
 }
 function enterMatchRoom(roomId){
 try{localStorage.setItem('xq_last_color','');}catch(e){}

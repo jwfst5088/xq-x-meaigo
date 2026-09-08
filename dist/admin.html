@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理后台 - 中国象棋</title>
+<style>
+body{background:#1a0f0a;color:#e8d5b5;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;margin:0;padding:24px;box-sizing:border-box}
+h2{color:#d4a843;margin:0 0 16px}
+input,button{font-family:inherit}
+input{background:#2c1810;border:1px solid #5a3a28;color:#e8d5b5;border-radius:6px;padding:8px 10px;outline:none}
+input:focus{border-color:#d4a843}
+button{background:#3d2117;border:1px solid #d4a843;color:#d4a843;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700}
+button:hover{background:#4d2c1d}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+th{color:#d4a843;text-align:left;padding:6px 8px;border-bottom:1px solid #5a3a28;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #2c1810}
+.num{width:80px}
+.err{color:#e74c3c;font-size:13px;min-height:18px;margin-top:8px}
+.ok{color:#2ecc71;font-size:13px;min-height:18px;margin-top:8px}
+.mut{color:#8b7355;font-size:12px}
+.save{padding:3px 10px;font-size:12px}
+.wrap{max-width:1080px;margin:0 auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h2>🎯 棋力管理后台</h2>
+<div id="loginBox">
+  <div style="margin:10px 0">
+    <input id="pwd" type="password" placeholder="管理密码" style="width:220px" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()" style="margin-left:8px">登录</button>
+  </div>
+  <div class="err" id="lerr"></div>
+</div>
+<div id="panel" style="display:none">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b id="cnt" style="color:#d4a843"></b>
+    <input id="q" placeholder="搜索名字/设备号" style="width:220px" oninput="render()">
+    <button onclick="load()">刷新</button>
+    <button onclick="logout()">退出登录</button>
+  </div>
+  <div id="msg" class="ok"></div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>名字</th><th>段位</th><th>棋力分</th><th>场次</th><th>胜/负/和</th><th>设备/账号ID</th><th>最后在线</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="mut" style="margin-top:10px">修改棋力分后段位自动对应；范围 -250 ~ 7000（学1-1 = -160 起）</div>
+</div>
+</div>
+<script>
+var TOKEN = localStorage.getItem("xq_admin_token") || "";
+var DATA = [];
+function api(p, b) {
+  return fetch(p, { method: b ? "POST" : "GET", headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : undefined }).then(function (r) { return r.json(); });
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+}
+function login() {
+  var p = document.getElementById("pwd").value;
+  api("/api/admin/login", { password: p }).then(function (r) {
+    if (r && r.ok) {
+      TOKEN = r.token;
+      localStorage.setItem("xq_admin_token", TOKEN);
+      enter();
+    } else {
+      document.getElementById("lerr").textContent = (r && r.error) || "登录失败";
+    }
+  }).catch(function () { document.getElementById("lerr").textContent = "网络异常"; });
+}
+function enter() {
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("panel").style.display = "";
+  load();
+}
+function logout() {
+  localStorage.removeItem("xq_admin_token");
+  location.reload();
+}
+function load() {
+  api("/api/admin/players?token=" + encodeURIComponent(TOKEN)).then(function (r) {
+    if (r && r.ok) {
+      DATA = r.list || [];
+      document.getElementById("cnt").textContent = "玩家总数: " + DATA.length;
+      render();
+    } else {
+      localStorage.removeItem("xq_admin_token");
+      document.getElementById("panel").style.display = "none";
+      document.getElementById("loginBox").style.display = "";
+      document.getElementById("lerr").textContent = (r && r.error) || "请重新登录";
+    }
+  }).catch(function () {});
+}
+function render() {
+  var q = (document.getElementById("q").value || "").toLowerCase();
+  var rows = document.getElementById("rows");
+  var h = "";
+  DATA.forEach(function (p, i) {
+    var id = p.deviceId || "";
+    if (q && id.toLowerCase().indexOf(q) < 0 && (p.name || "").toLowerCase().indexOf(q) < 0) return;
+    h += "<tr>"
+      + "<td>" + esc(p.name || "(未命名)") + "</td>"
+      + "<td>" + esc(p.title || "") + "</td>"
+      + "<td><input class=\"num\" type=\"number\" id=\"sc_" + i + "\" value=\"" + p.elo + "\"></td>"
+      + "<td>" + p.games + "</td>"
+      + "<td>" + p.wins + "/" + p.losses + "/" + p.draws + "</td>"
+      + "<td class=\"mut\" style=\"max-width:220px;word-break:break-all\">" + esc(id) + "</td>"
+      + "<td class=\"mut\">" + (p.last_seen ? new Date(p.last_seen).toLocaleString() : "-") + "</td>"
+      + "<td><button class=\"save\" onclick=\"save(" + i + ")\">保存</button></td>"
+      + "</tr>";
+  });
+  rows.innerHTML = h || '<tr><td colspan="8" class="mut">无匹配玩家</td></tr>';
+}
+function save(i) {
+  var p = DATA[i];
+  var v = Number(document.getElementById("sc_" + i).value);
+  api("/api/admin/setScore", { token: TOKEN, deviceId: p.deviceId, score: v }).then(function (r) {
+    var m = document.getElementById("msg");
+    if (r && r.ok) {
+      p.elo = r.player.elo;
+      p.title = r.player.title;
+      m.textContent = "✔ 已保存: " + (p.name || p.deviceId) + " → " + p.elo + "（" + p.title + "）";
+      render();
+    } else {
+      m.textContent = "✘ " + ((r && r.error) || "失败");
+    }
+  }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
+}
+if (TOKEN) {
+  enter();
+} 
+</script>
+</body>
+</html>
