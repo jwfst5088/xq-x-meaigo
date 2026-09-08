@@ -982,6 +982,14 @@ var MatchQueue = class {
     this.queue = [];
     this.pairings = /* @__PURE__ */ new Map();
     this._loaded = false;
+    this.events = [];
+  }
+  _log(ev, detail) {
+    try {
+      this.events.push({ t: Date.now(), ev: ev, d: detail || "" });
+      if (this.events.length > 40) this.events = this.events.slice(-40);
+    } catch (e) {
+    }
   }
   async _ensureLoaded() {
     if (this._loaded) return;
@@ -1020,6 +1028,7 @@ var MatchQueue = class {
           pairedTickets.add(b.ticket);
           const roomId = "M" + Math.random().toString(36).slice(2, 6) + now.toString(36).slice(-4);
           const redIsA = Math.random() < 0.5;
+          this._log("pair", (a.name || "?") + " vs " + (b.name || "?") + " room=" + roomId);
           this.pairings.set(a.ticket, { data: { roomId, color: redIsA ? "red" : "black", oppName: b.name || null, oppElo: b.elo || null, rated: true }, ts: now });
           this.pairings.set(b.ticket, { data: { roomId, color: redIsA ? "black" : "red", oppName: a.name || null, oppElo: a.elo || null, rated: true }, ts: now });
           break;
@@ -1062,6 +1071,7 @@ var MatchQueue = class {
         const devCount = this.queue.filter((e) => e.deviceId === body.deviceId).length;
         if (devCount >= 3) this.queue = this.queue.filter((e) => e.deviceId !== body.deviceId);
         this.queue.push({ ticket, deviceId: String(body.deviceId).slice(0, 64), name: body.name ? String(body.name).slice(0, 24) : null, elo, ts: Date.now() });
+        this._log("join", (body.name || body.deviceId) + " elo=" + elo + " queue=" + this.queue.length);
         await this._tryPair();
         await this._scheduleSweep();
         await this._persist();
@@ -1085,6 +1095,7 @@ var MatchQueue = class {
       try {
         const body = await request.json();
         this.queue = this.queue.filter((e) => e.ticket !== body.ticket);
+        this._log("cancel", "left=" + this.queue.length);
         await this._persist();
         return Response.json({ ok: true });
       } catch (e) {
@@ -1093,7 +1104,7 @@ var MatchQueue = class {
     }
     if (path === "/debug") {
       const now = Date.now();
-      return Response.json({ ok: true, queueSize: this.queue.length, pairings: this.pairings.size, queue: this.queue.map((e) => ({ dev: String(e.deviceId).slice(0, 6) + "***", name: e.name || null, elo: e.elo, ageSec: Math.floor((now - e.ts) / 1e3), ticket: String(e.ticket).slice(0, 6) })) });
+      return Response.json({ ok: true, queueSize: this.queue.length, pairings: this.pairings.size, queue: this.queue.map((e) => ({ dev: String(e.deviceId).slice(0, 6) + "***", name: e.name || null, elo: e.elo, ageSec: Math.floor((now - e.ts) / 1e3), ticket: String(e.ticket).slice(0, 6) })), events: this.events });
     }
     return Response.json({ ok: false, error: "unknown" }, { status: 404 });
   }

@@ -6498,7 +6498,8 @@ html+='<div id="rvStatus" style="font-size:13px;color:#d4a843;margin:6px 0">引�
 html+='<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:820px">';
 html+='<div><canvas id="rvCurve" width="500" height="140" style="width:500px;max-width:96vw;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>';
 html+='<div id="rvDetail" style="font-size:12px;color:#c4a882;margin:6px 0;min-height:20px">分析完成后点击棋谱查看局面</div>';
-html+='<canvas id="rvBoard" width="270" height="300" style="width:270px;max-width:60vw;background:#f0d9b5;border-radius:4px"></canvas></div>';
+html+='<canvas id="rvBoard" width="270" height="300" style="width:270px;max-width:60vw;background:#f0d9b5;border-radius:4px"></canvas>';
+html+='<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button id="rvPrev" class="btn btn-outline" style="width:auto;padding:8px 18px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button id="rvNext" class="btn btn-outline" style="width:auto;padding:8px 18px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button></div></div>';
 html+='<div id="rvList" style="max-width:280px;max-height:440px;overflow-y:auto;font-size:12px;text-align:left;line-height:2;min-width:240px"></div>';
 html+='</div>';
 html+='<div class="btns2" style="margin-top:8px"><button class="btn btn-outline" style="width:auto;padding:8px 16px" onclick="hideOverlay()">关闭</button></div>';
@@ -6534,7 +6535,7 @@ computeDrops(plies);
 drawCurve(plies);
 buildMoveList(plies,snap);
 var st=$id('rvStatus');if(st)st.textContent='✅ 复盘完成 · 点击右侧棋谱查看局面与评估';
-if(plies.length){var rev2=buildEngineToPly(1,snap.moves);drawMiniBoard(rev2);}
+if(plies.length){window._rvIdx=0;var rev2=buildEngineToPly(1,snap.moves);drawMiniBoard(rev2);}
 }
 }
 function buildEngineToPly(n,moves){
@@ -6624,6 +6625,8 @@ ctx.fillText(t,x,y+1);
 }
 window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
+if(i<0)i=0;if(i>plies.length-1)i=plies.length-1;
+window._rvIdx=i;
 var rev=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
 drawMiniBoard(rev);
 var p=plies[i];var d=$id('rvDetail');if(!d)return;
@@ -6631,6 +6634,14 @@ var w=p?scoreToRedWin(p.score,p.turn):null;
 var wTxt=(w==null)?'评估不可用':'红方胜率 '+w.toFixed(0)+'%';
 var dropTxt=(p&&p.drop!==undefined&&p.drop>=25)?(' · <span style="color:'+(p.drop>=45?'#e74c3c':'#f39c12')+'">此步失分 '+p.drop.toFixed(0)+'</span>'):'';
 d.innerHTML='第'+(i+1)+'步（'+(p&&p.turn==='red'?'红':'黑')+'方走后局面）· '+wTxt+dropTxt;
+};
+window.rvStep=function(dir){
+var plies=window._rvPlies;if(!plies||!plies.length)return;
+var i=(window._rvIdx===undefined||window._rvIdx===null)?-1:window._rvIdx;
+i+=dir;
+if(i<0){toast('已经是第一步之前');return;}
+if(i>plies.length-1){toast('已经是最后一步');return;}
+showRvPly(i);
 };
 })();
 </script>
