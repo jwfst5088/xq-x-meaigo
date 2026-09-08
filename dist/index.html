@@ -1628,9 +1628,9 @@ socket.on('player_disconnected',function(d){
 		hideOverlay();
 		try{
 			if(engine.gameOver)return;
-			var tt=D('turnText');if(tt)tt.textContent='对手断线，45秒后判你获胜';
+			var tt=D('turnText');if(tt)tt.textContent='对手断线，12秒后判你获胜';
 			if(window._dcTimer)clearInterval(window._dcTimer);
-			var _dc=45;
+			var _dc=12;
 			window._dcTimer=setInterval(function(){
 				_dc--;
 				if(_dc<=0){clearInterval(window._dcTimer);window._dcTimer=null;return;}

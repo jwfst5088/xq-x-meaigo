@@ -845,7 +845,7 @@ var ChessRoom = class {
           if (!this.room || this.room.gameOver) return;
           const now = Date.now();
           for (const color of ["red", "black"]) {
-            if (this.disconnected[color] && now - this.disconnected[color] > 45e3) {
+            if (this.disconnected[color] && now - this.disconnected[color] > 12e3) {
               this.room.gameOver = true;
               this.room._gameEndedAt = now;
               this.room.winner = color === "red" ? "black" : "red";
@@ -861,7 +861,7 @@ var ChessRoom = class {
             }
           }
           this.room._disconnectTimer = null;
-        }, 48e3);
+        }, 15e3);
       }
     };
     ws.onerror = () => {
@@ -1175,7 +1175,7 @@ var MatchQueue = class {
         if (Math.abs(a.elo - b.elo) <= tol) {
           pairedTickets.add(a.ticket);
           pairedTickets.add(b.ticket);
-          const roomId = "M" + Math.random().toString(36).slice(2, 6) + now.toString(36).slice(-4);
+          const roomId = String(Math.floor(1000 + Math.random() * 9000));
           const redIsA = Math.random() < 0.5;
           this._log("pair", (a.name || "?") + " vs " + (b.name || "?") + " room=" + roomId);
           this.pairings.set(a.ticket, { data: { roomId, color: redIsA ? "red" : "black", oppName: b.name || null, oppElo: b.elo || null, rated: true }, ts: now });
