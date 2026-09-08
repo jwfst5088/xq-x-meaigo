@@ -1190,8 +1190,8 @@ soundEnabled=true;gameOverSoundPlayed=false;undoUsed=false;aiThinking=false;
 gm='ai';myCl=userColor;myRm=null;boardFlip=(userColor==='black');
 aiCl=(userColor==='red')?'black':'red';
 D('drawBtn').style.display='none';
-D('redName').textContent=(userColor==='red')?'我（红方）':'AI（红方）';
-D('blackName').textContent=(userColor==='black')?'我（黑方）':'AI（黑方）';
+D('redName').textContent=(userColor==='red')?_xqMyName()+'（红方）':'AI（红方）';
+D('blackName').textContent=(userColor==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
 D('modeBadge').textContent='人机对弈';
 engine.initBoard();engine.currentTurn='red';engine.gameOver=false;engine.winner=null;engine.moveHistory=[];
 capRed=[];capBlk=[];lastMove=null;selected=null;validMoves=[];gameStarted=true;clickCount=0;
@@ -1210,8 +1210,8 @@ soundEnabled=true;gameOverSoundPlayed=false;undoUsed=false;aiThinking=false;
 gm='ai';
 var uc=Math.random()<0.5?'red':'black';
 myCl=uc;boardFlip=(uc==='black');aiCl=(uc==='red')?'black':'red';
-D('redName').textContent=(uc==='red')?'我（红方）':'AI（红方）';
-D('blackName').textContent=(uc==='black')?'我（黑方）':'AI（黑方）';
+D('redName').textContent=(uc==='red')?_xqMyName()+'（红方）':'AI（红方）';
+D('blackName').textContent=(uc==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
 D('modeBadge').textContent='人机对弈';
 engine.initBoard();engine.currentTurn='red';engine.gameOver=false;engine.winner=null;engine.moveHistory=[];
 capRed=[];capBlk=[];lastMove=null;selected=null;validMoves=[];gameStarted=true;clickCount=0;checkStreak=0;lastCheckColor=null;
@@ -6063,8 +6063,8 @@ function startPikafishGame(userColor){
 	gm = 'pikafish'; myCl = userColor; myRm = null; boardFlip = (userColor === 'black');
 	aiCl = (userColor === 'red') ? 'black' : 'red';
 	D('drawBtn').style.display = 'none';
-	D('redName').textContent = (userColor === 'red') ? '我（红方）' : 'Pikafish（红方）';
-	D('blackName').textContent = (userColor === 'black') ? '我（黑方）' : 'Pikafish（黑方）';
+	D('redName').textContent = (userColor === 'red') ? _xqMyName()+'（红方）' : 'Pikafish（红方）';
+	D('blackName').textContent = (userColor === 'black') ? _xqMyName()+'（黑方）' : 'Pikafish（黑方）';
 	D('modeBadge').textContent = 'Pikafish 深度AI';
 	engine.initBoard(); engine.currentTurn = 'red'; engine.gameOver = false; engine.winner = null; engine.moveHistory = [];
 	capRed = []; capBlk = []; lastMove = null; selected = null; validMoves = []; gameStarted = true; clickCount = 0;
@@ -6133,8 +6133,8 @@ function retryPikafishGame(){
 	gm = 'pikafish';
 	var uc = Math.random() < 0.5 ? 'red' : 'black';
 	myCl = uc; boardFlip = (uc === 'black'); aiCl = (uc === 'red') ? 'black' : 'red';
-	D('redName').textContent = (uc === 'red') ? '我（红方）' : 'Pikafish（红方）';
-	D('blackName').textContent = (uc === 'black') ? '我（黑方）' : 'Pikafish（黑方）';
+	D('redName').textContent = (uc === 'red') ? _xqMyName()+'（红方）' : 'Pikafish（红方）';
+	D('blackName').textContent = (uc === 'black') ? _xqMyName()+'（黑方）' : 'Pikafish（黑方）';
 	D('modeBadge').textContent = 'Pikafish 深度AI';
 	engine.initBoard(); engine.currentTurn = 'red'; engine.gameOver = false; engine.winner = null; engine.moveHistory = [];
 	capRed = []; capBlk = []; lastMove = null; selected = null; validMoves = []; gameStarted = true; clickCount = 0; checkStreak = 0; lastCheckColor = null;
@@ -6224,8 +6224,8 @@ gm=g.gm;myCl=g.myCl||'red';aiCl=g.aiCl||'black';boardFlip=(myCl==='black');sound
 D('lobby').classList.add('hide');D('game').classList.add('show');
 D('modeBadge').textContent=(g.gm==='pikafish')?'Pikafish深度AI':'人机对弈';
 D('drawBtn').style.display='none';
-D('redName').textContent=(myCl==='red')?'我（红方）':'AI（红方）';
-D('blackName').textContent=(myCl==='black')?'我（黑方）':'AI（黑方）';
+D('redName').textContent=(myCl==='red')?_xqMyName()+'（红方）':'AI（红方）';
+D('blackName').textContent=(myCl==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
 engine.initBoard();
 capRed=[];capBlk=[];lastMove=null;
 if(g.moveHistory){for(var i=0;i<g.moveHistory.length;i++){var m=g.moveHistory[i];var rs=engine.move(m.fromRow,m.fromCol,m.toRow,m.toCol);if(rs&&rs.captured){if(rs.captured.color==='red')capRed.push(rs.captured);else capBlk.push(rs.captured);}}}
@@ -6295,6 +6295,7 @@ if(!d||d.length<3){d='D'+Math.random().toString(36).slice(2,10)+Date.now().toStr
 return d;}
 function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return null;}}
 window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||(p&&p.name)||null,elo:(p&&p.elo)?p.elo:-160};};
+window._xqMyName=function(){try{return getName()||(window._xqProfile&&window._xqProfile.name)||'游客';}catch(e){return '游客';}};
 function renderProfile(p){
 var box=$id('profileBox');if(!box||!p)return;
 var nm=p.name||'游客';
