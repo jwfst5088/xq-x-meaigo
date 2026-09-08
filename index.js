@@ -845,7 +845,7 @@ var ChessRoom = class {
           if (!this.room || this.room.gameOver) return;
           const now = Date.now();
           for (const color of ["red", "black"]) {
-            if (this.disconnected[color] && now - this.disconnected[color] > 18e4) {
+            if (this.disconnected[color] && now - this.disconnected[color] > 45e3) {
               this.room.gameOver = true;
               this.room._gameEndedAt = now;
               this.room.winner = color === "red" ? "black" : "red";
@@ -861,7 +861,7 @@ var ChessRoom = class {
             }
           }
           this.room._disconnectTimer = null;
-        }, 183e3);
+        }, 48e3);
       }
     };
     ws.onerror = () => {

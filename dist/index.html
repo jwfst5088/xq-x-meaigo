@@ -1626,11 +1626,22 @@ stopTimer();engine.gameOver=true;engine.winner=d.winner;showGameOver(d.winner===
 socket.on('player_disconnected',function(d){
 	if(gm==='online'&&myRm){
 		hideOverlay();
-		try{var tt=D('turnText');if(tt&&!engine.gameOver)tt.textContent='对手断线，等待重连…';}catch(e){}
+		try{
+			if(engine.gameOver)return;
+			var tt=D('turnText');if(tt)tt.textContent='对手断线，45秒后判你获胜';
+			if(window._dcTimer)clearInterval(window._dcTimer);
+			var _dc=45;
+			window._dcTimer=setInterval(function(){
+				_dc--;
+				if(_dc<=0){clearInterval(window._dcTimer);window._dcTimer=null;return;}
+				try{var t2=D('turnText');if(t2&&!engine.gameOver)t2.textContent='对手断线，'+_dc+'秒后判你获胜';}catch(e){}
+			},1000);
+		}catch(e){}
 	}
 });
 socket.on('player_reconnected',function(d){
 	if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
+	try{var tt=D('turnText');if(tt&&!engine.gameOver)tt.textContent=(engine.currentTurn==='red')?'红方走棋':'黑方走棋';}catch(e){}
 	hideOverlay();hideReconnecting();
 });
 socket.on('room_state',function(d){
