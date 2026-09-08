@@ -1626,6 +1626,7 @@ stopTimer();engine.gameOver=true;engine.winner=d.winner;showGameOver(d.winner===
 socket.on('player_disconnected',function(d){
 	if(gm==='online'&&myRm){
 		hideOverlay();
+		try{var tt=D('turnText');if(tt&&!engine.gameOver)tt.textContent='对手断线，等待重连…';}catch(e){}
 	}
 });
 socket.on('player_reconnected',function(d){

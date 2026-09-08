@@ -753,13 +753,41 @@ var ChessRoom = class {
             this.room.spectators.delete(ws);
             return;
           }
-          const room = this.room;
+          // 对局进行中主动退出 = 逃跑判负: 对方立即获胜并按段位差计分, 房间保留给留下的一方
+          if (this.room.gameStarted && !this.room.gameOver && socketData.color && !this.room._ratedRecorded) {
+            this.room.gameOver = true;
+            this.room._gameEndedAt = Date.now();
+            this.room.winner = socketData.color === "red" ? "black" : "red";
+            if (this.room._timer) {
+              clearInterval(this.room._timer);
+              this.room._timer = null;
+            }
+            if (this.room._disconnectTimer) {
+              clearTimeout(this.room._disconnectTimer);
+              this.room._disconnectTimer = null;
+            }
+            this.broadcastToOpponent(ws, JSON.stringify({ event: "game_over", data: { winner: this.room.winner, reason: "opponent_left" } }));
+            this.ctx.waitUntil(this._recordGameEnd("opponent_left"));
+            this.ctx.waitUntil(this._saveRoomState());
+          }
+          const roomLeaving = this.room;
+          const teardownEmpty = roomLeaving.gameOver ? roomLeaving.players.size <= 1 : true;
+          roomLeaving.players.delete(ws);
+          if (socketData.color && this.disconnected[socketData.color]) delete this.disconnected[socketData.color];
+          if (!teardownEmpty) {
+            // 留下的一方继续留在房间看结果
+            try {
+              ws.close();
+            } catch (e) {
+            }
+            return;
+          }
+          const room = roomLeaving;
           this.room = null;
           if (room._timer) {
             clearInterval(room._timer);
             room._timer = null;
           }
-          room.players.delete(ws);
           for (const [pws] of room.players) {
             try {
               pws.send(JSON.stringify({ event: "opponent_left", data: {} }));
@@ -925,7 +953,7 @@ var ChessRoom = class {
       blkTime: this.room.blkTime,
       capturedRed: this.room.capturedRed,
       capturedBlack: this.room.capturedBlack,
-      gameStarted: this.room.players.size >= 2,
+      gameStarted: this.room.gameStarted || this.room.players.size >= 2,
       seatInfo: {
         red: si.red ? { name: si.red.name || (si.red.dev ? "\u6e38\u5ba2" : null), elo: si.red.elo || null, title: si.red.elo ? rankTitle(si.red.elo) : null } : null,
         black: si.black ? { name: si.black.name || (si.black.dev ? "\u6e38\u5ba2" : null), elo: si.black.elo || null, title: si.black.elo ? rankTitle(si.black.elo) : null } : null
