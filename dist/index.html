@@ -73,7 +73,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 .overlay .box{background:#2c1810;border-radius:14px;padding:24px 18px;text-align:center;max-width:280px;width:90%;border:1px solid #5a3a28}
 .overlay h2{font-size:20px;color:#d4a843;margin-bottom:4px}
 .overlay p{font-size:13px;color:#c4a882;margin-bottom:14px}
-.overlay .btns2{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.overlay .btns2{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}@media(max-width:768px){.btns2{flex-direction:column;align-items:stretch}.btns2>*{width:100%;box-sizing:border-box;text-align:center}}.overlay .box{max-height:86vh;overflow-y:auto}
 .chat-display{height:24px;line-height:24px;padding:0 10px;text-align:center;background:#1a0f0a;border-bottom:1px solid #3d2117;color:#d4a843;font-size:13px;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .chat-area{display:flex;gap:8px;padding:8px;background:#2c1810;border-top:1px solid #5a3a28;flex-shrink:0}
 .chat-input{flex:1;padding:6px 10px;border:1px solid #5a3a28;border-radius:8px;background:#3d2117;color:#f0e6d3;font-size:13px;outline:none}
@@ -1521,7 +1521,7 @@ hideReconnecting();
 var isPageReload=!!window._pendingReconnect;
 if(window._pendingRoomAction&&socket.roomId){var pa=window._pendingRoomAction;window._pendingRoomAction=null;
  if(pa.action==='reconnect'){socket.emit('reconnect_room',Object.assign({roomId:pa.roomId,color:pa.color},window._xqIdentityFields?window._xqIdentityFields():{}));}
- else if(pa.action==='create'){socket.emit('create_room',{roomId:pa.roomId,lastColor:pa.lastColor||null});}
+ else if(pa.action==='create'){socket.emit('create_room',Object.assign({roomId:pa.roomId,lastColor:pa.lastColor||null},window._xqIdentityFields?window._xqIdentityFields():{}));}
  else{socket.emit(pa.action+'_room',Object.assign({roomId:pa.roomId},window._xqIdentityFields?window._xqIdentityFields():{}));}
 }
 else if(window._pendingReconnect){var pr=window._pendingReconnect;if(pr.redLeft!==undefined){redLeft=pr.redLeft;blkLeft=pr.blkLeft;}window._pendingReconnect=null;socket.emit('reconnect_room',Object.assign({roomId:pr.myRm,color:pr.myCl},window._xqIdentityFields?window._xqIdentityFields():{}));}
