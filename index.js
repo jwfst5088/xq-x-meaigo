@@ -27,33 +27,54 @@ var aiWeights = {
 var aiTotalStats = { games: 0, redWins: 0, blkWins: 0, draws: 0 };
 
 // ===== 等级分系统 (Elo + 段位) =====
-var RANK_TIERS = [
-  [2200, "\u7279\u7ea7\u5927\u5e08"],
-  [2000, "\u5730\u533a\u5927\u5e08"],
-  [1800, "\u4e1a\u4f59\u4e00\u7ea7"],
-  [1600, "\u4e1a\u4f59\u4e8c\u7ea7"],
-  [1400, "\u4e1a\u4f59\u4e09\u7ea7"],
-  [1200, "\u4e1a\u4f59\u56db\u7ea7"],
-  [1000, "\u4e1a\u4f59\u4e94\u7ea7"],
-  [0, "\u4e1a\u4f59\u516d\u7ea7"]
+const TIER_TABLE = [
+  [-160, "\u5b661-1"], [-100, "\u5b661-2"], [-40, "\u5b661-3"],
+  [20, "\u5b662-1"], [80, "\u5b662-2"], [140, "\u5b662-3"],
+  [200, "\u5b663-1"], [260, "\u5b663-2"], [320, "\u5b663-3"],
+  [400, "\u4e1a1-1"], [480, "\u4e1a1-2"], [560, "\u4e1a1-3"],
+  [640, "\u4e1a2-1"], [720, "\u4e1a2-2"], [800, "\u4e1a2-3"],
+  [880, "\u4e1a3-1"], [960, "\u4e1a3-2"], [1040, "\u4e1a3-3"],
+  [1120, "\u4e1a4-1"], [1200, "\u4e1a4-2"], [1280, "\u4e1a4-3"],
+  [1360, "\u4e1a5-1"], [1440, "\u4e1a5-2"], [1520, "\u4e1a5-3"],
+  [1600, "\u4e1a6-1"], [1700, "\u4e1a6-2"], [1800, "\u4e1a6-3"],
+  [1900, "\u4e1a7-1"], [2000, "\u4e1a7-2"], [2100, "\u4e1a7-3"],
+  [2200, "\u4e1a8-1"], [2350, "\u4e1a8-2"], [2500, "\u4e1a8-3"],
+  [2700, "\u4e1a9-1"], [3000, "\u4e1a9-2"], [3300, "\u4e1a9-3"],
+  [3700, "\u4e131-1"], [4100, "\u4e131-2"], [4500, "\u4e131-3"],
+  [5000, "\u4e132-1"], [5500, "\u4e132-2"], [6000, "\u4e132-3"],
+  [6400, "\u4e133-1"], [6700, "\u4e133-2"], [7000, "\u4e133-3"]
 ];
-function rankTitle(elo) {
-  for (const tier of RANK_TIERS) {
-    if (elo >= tier[0]) return tier[1];
+const TIER_SCORE_MIN = -250;
+const TIER_SCORE_MAX = 7000;
+const TIER_SCORE_DEFAULT = -160;
+function rankTitle(score) {
+  let label = TIER_TABLE[0][1];
+  for (const t of TIER_TABLE) {
+    if (score >= t[0]) label = t[1];
   }
-  return "\u4e1a\u4f59\u516d\u7ea7";
+  return label;
 }
 __name(rankTitle, "rankTitle");
-function kFactor(games, elo) {
-  if (games < 30) return 40;
-  if (elo >= 2e3) return 16;
-  return 32;
+function tierIndex(score) {
+  let i = 0;
+  for (let k = 0; k < TIER_TABLE.length; k++) {
+    if (score >= TIER_TABLE[k][0]) i = k;
+  }
+  return i;
 }
-__name(kFactor, "kFactor");
-function expectedScore(a, b) {
-  return 1 / (1 + Math.pow(10, (b - a) / 400));
+__name(tierIndex, "tierIndex");
+// 天天象棋棋力评测结算: 同小段 ±10; 对手低1小段 胜+15/负-5; 对手高1小段 胜+5/负-15; 平0
+function tierDelta(myScore, oppScore, outcome) {
+  if (outcome === 0.5) return 0;
+  let d = tierIndex(myScore) - tierIndex(oppScore);
+  if (d > 1) d = 1;
+  else if (d < -1) d = -1;
+  const win = outcome === 1;
+  if (d === 0) return win ? 10 : -10;
+  if (d > 0) return win ? 15 : -5;
+  return win ? 5 : -15;
 }
-__name(expectedScore, "expectedScore");
+__name(tierDelta, "tierDelta");
 async function ensureRatingTables(db) {
   if (!db) return;
   try {
@@ -67,7 +88,7 @@ async function upsertPlayer(db, deviceId, name) {
   if (!db || !deviceId) return null;
   const now = Date.now();
   try {
-    await db.prepare("INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, 1200, 0, 0, 0, 0, ?, ?) ON CONFLICT(device_id) DO UPDATE SET last_seen = excluded.last_seen").bind(deviceId, name || null, now, now).run();
+    await db.prepare("INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, -160, 0, 0, 0, 0, ?, ?) ON CONFLICT(device_id) DO UPDATE SET last_seen = excluded.last_seen").bind(deviceId, name || null, now, now).run();
     if (name) await db.prepare("UPDATE players SET name = ? WHERE device_id = ?").bind(name, deviceId).run();
     return await db.prepare("SELECT * FROM players WHERE device_id = ?").bind(deviceId).first();
   } catch (e) {
@@ -103,19 +124,17 @@ async function applyEloResult(db, roomId, red, black, result, reason, moveCount)
   if (!["red", "black", "draw"].includes(result)) return null;
   try {
     const now = Date.now();
-    const insP = "INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, 1200, 0, 0, 0, 0, ?, ?)";
+    const insP = "INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, -160, 0, 0, 0, 0, ?, ?)";
     const r0 = await db.prepare("SELECT elo, games FROM players WHERE device_id = ?").bind(red.dev).first();
     if (!r0) await db.prepare(insP).bind(red.dev, red.name || null, now, now).run();
     const b0 = await db.prepare("SELECT elo, games FROM players WHERE device_id = ?").bind(black.dev).first();
     if (!b0) await db.prepare(insP).bind(black.dev, black.name || null, now, now).run();
-    const before = { red: r0 ? r0.elo : 1200, black: b0 ? b0.elo : 1200 };
-    const rGames = r0 ? r0.games : 0;
-    const bGames = b0 ? b0.games : 0;
-    const expR = expectedScore(before.red, before.black);
-    const scoreR = result === "red" ? 1 : result === "draw" ? 0.5 : 0;
-    const dR = Math.round(kFactor(rGames, before.red) * (scoreR - expR));
-    const dB = Math.round(kFactor(bGames, before.black) * (1 - scoreR - (1 - expR)));
-    const after = { red: Math.max(100, before.red + dR), black: Math.max(100, before.black + dB) };
+    const before = { red: r0 ? r0.elo : TIER_SCORE_DEFAULT, black: b0 ? b0.elo : TIER_SCORE_DEFAULT };
+    const outcomeR = result === "red" ? 1 : result === "draw" ? 0.5 : 0;
+    const outcomeB = result === "black" ? 1 : result === "draw" ? 0.5 : 0;
+    const dR = tierDelta(before.red, before.black, outcomeR);
+    const dB = tierDelta(before.black, before.red, outcomeB);
+    const after = { red: Math.max(TIER_SCORE_MIN, Math.min(TIER_SCORE_MAX, before.red + dR)), black: Math.max(TIER_SCORE_MIN, Math.min(TIER_SCORE_MAX, before.black + dB)) };
     const wr = result === "red" ? 1 : 0;
     const br = result === "black" ? 1 : 0;
     const dr = result === "draw" ? 1 : 0;
@@ -1053,7 +1072,8 @@ var MatchQueue = class {
         const b = sorted[j];
         if (pairedTickets.has(b.ticket)) continue;
         const waitSec = Math.floor((now - Math.min(a.ts, b.ts)) / 1e3);
-        const tol = 150 + waitSec * 10;
+        // 棋力分制: 初始±小段约60-80分, 起始容差60, 等待越久越宽(上限600)
+        const tol = Math.min(60 + waitSec * 12, 600);
         if (Math.abs(a.elo - b.elo) <= tol) {
           pairedTickets.add(a.ticket);
           pairedTickets.add(b.ticket);

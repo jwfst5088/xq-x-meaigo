@@ -197,7 +197,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <button id="loginBtn" class="auth-btn" onclick="openAuthModal()">登录 / 注册</button>
 <div id="profileBox" class="user-chip" style="display:none" onclick="profileChipClick()" title="点击管理账号">
 <div class="uc-avatar" id="ucAvatar">客</div>
-<div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div><div class="uc-stats">Elo <b id="pfElo">1200</b> · <span id="pfRecord">0胜 0和 0负</span></div></div>
+<div class="uc-info"><div class="uc-name"><span id="pfName">游客</span><i id="pfTitle"></i></div><div class="uc-stats">Elo <b id="pfElo">-160</b> · <span id="pfRecord">0胜 0和 0负</span></div></div>
 </div>
 </div>
 </div>
@@ -205,7 +205,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="lb-main">
 <div class="hero-slogan">对 弈 · 竞 技 · 升 段</div>
 <button id="matchBtn" class="match-cta" onclick="quickMatch()">⚡ 快速匹配</button>
-<div id="matchHint" class="hero-hint">按等级分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分</div>
+<div id="matchHint" class="hero-hint">按棋力评分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分</div>
 <div class="join-grid">
 <div class="join"><input id="createInput" placeholder="留空自动生成房间号" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')createRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="createRoom()">创建房间</button></div>
 <div class="join"><input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入房间</button></div>
@@ -235,7 +235,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <aside class="lb-side" id="lbSide">
 <div class="side-head"><span>🏆 天梯排行榜</span><button class="side-close" onclick="toggleLeaderboard()">✕</button></div>
 <div id="lbList" class="side-list"></div>
-<div class="side-note">段位：业余六级 → 业余五级 → … → 业余一级 → 地区大师 → 特级大师<br>等级分初始 1200，在线对战自动升降，AI 对局不计分</div>
+<div class="side-note">段位：学1-1(-160) → 业1-1(400) → 业4-2(1200) → 业9-3(3300) → 专3-3(7000封顶)<br>初始积分 -160（学徒1-1），同段胜+10平0负-10，在线对战自动升降，AI 对局不计分</div>
 </aside>
 </div>
 <div class="footer" id="footerText">人机对弈需联网 | 在线模式两人对战</div>
@@ -6297,7 +6297,7 @@ function getDev(){var d=null;try{d=localStorage.getItem(DEV_KEY);}catch(e){}
 if(!d||d.length<3){d='D'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem(DEV_KEY,d);}catch(e){}}
 return d;}
 function getName(){try{return localStorage.getItem(NAME_KEY);}catch(e){return null;}}
-window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||null,elo:(p&&p.elo)?p.elo:1200};};
+window._xqIdentityFields=function(){var p=window._xqProfile;return {deviceId:getDev(),playerName:getName()||null,elo:(p&&p.elo)?p.elo:-160};};
 function renderProfile(p){
 var box=$id('profileBox');if(!box||!p)return;
 var nm=p.name||('棋手'+p.deviceId.slice(-4));
@@ -6337,7 +6337,7 @@ if(!u||!p){authErr('请输入用户名和密码');return;}
 authErr('');setAuthBusy(true);
 api('/api/auth/login',{method:'POST',body:JSON.stringify({username:u,password:p})}).then(function(r){
 setAuthBusy(false);
-if(r&&r.ok){closeAuthModal();window._xqSwitchToAccount(r.username);toast('✅ 欢迎回来，'+r.username+'！Elo '+((r.player&&r.player.elo)||1200),2400);}
+if(r&&r.ok){closeAuthModal();window._xqSwitchToAccount(r.username);toast('✅ 欢迎回来，'+r.username+'！棋力 '+((r.player&&r.player.elo)!=null?r.player.elo:-160),2400);}
 else{authErr((r&&r.error)||'登录失败');}
 }).catch(function(){setAuthBusy(false);authErr('网络异常，请重试');});
 }
@@ -6428,7 +6428,7 @@ window._xqOnRatingUpdate=function(d){
 try{
 api('/api/player/profile?deviceId='+encodeURIComponent(getDev())).then(function(r){
 if(r&&r.player){var prev=window._xqProfile;window._xqProfile=r.player;renderProfile(r.player);
-if(prev&&prev.elo!==r.player.elo){var diff=r.player.elo-prev.elo;toast((diff>=0?'📈 等级分 +':'📉 等级分 ')+diff+' → '+r.player.elo+'（'+(r.player.title||'')+'）',2800);}}
+if(prev&&prev.elo!==r.player.elo){var diff=r.player.elo-prev.elo;toast((diff>=0?'📈 棋力 +':'📉 棋力 ')+diff+' → '+r.player.elo+'（'+(r.player.title||'')+'）',2800);}}
 }).catch(function(){});
 }catch(e){}
 };
@@ -6532,7 +6532,7 @@ resetMatchBtn();
 function resetMatchBtn(){
 var btn=$id('matchBtn');
 if(btn){btn.textContent='⚡ 快速匹配';btn.classList.remove('matching');}
-var h=$id('matchHint');if(h){h.textContent='按等级分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分';h.style.color='';}
+var h=$id('matchHint');if(h){h.textContent='按棋力评分自动配对 · 15秒无人将自动匹配AI陪练 · AI对局不计分';h.style.color='';}
 }
 function enterMatchRoom(roomId){
 try{localStorage.setItem('xq_last_color','');}catch(e){}
