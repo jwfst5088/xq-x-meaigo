@@ -286,9 +286,22 @@ var ChessRoom = class {
     }
     return new Response("Not found", { status: 404 });
   }
-  handleRoomWebSocket(ws) {
+  _presenceDelta(delta, id) {
+    try {
+      if (!this.env || !this.env.MATCH_QUEUE || !id) return;
+      const stub = this.env.MATCH_QUEUE.get(this.env.MATCH_QUEUE.idFromName("global"));
+      stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta, id }) }).catch(() => {});
+    } catch (e) {}
+  }  handleRoomWebSocket(ws) {
     const socketData = { color: null, spectator: false, replaced: false };
     ws._socketData = socketData;
+    socketData.presId = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    this._presenceDelta(1, socketData.presId);
+    ws.addEventListener("close", () => {
+      try {
+        this._presenceDelta(-1, socketData.presId);
+      } catch (e) {}
+    });
     ws._lastSeen = Date.now();
     let heartbeatTimer = null;
     let heartbeatTimeout = null;
@@ -302,6 +315,10 @@ var ChessRoom = class {
         try {
           ws.send(JSON.stringify({ event: "ping" }));
         } catch (e) {
+        }
+        try {
+          this._presenceDelta(0, socketData.presId);
+        } catch (e2) {
         }
         heartbeatTimeout = setTimeout(() => {
           try {
@@ -1258,7 +1275,19 @@ const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
       try {
         const body = await request.json();
         const d = body && typeof body.delta === "number" ? body.delta : 0;
-        this.online = Math.max(0, (this.online || 0) + d);
+        const pid = body && body.id ? String(body.id).slice(0, 64) : null;
+        const now2 = Date.now();
+        if (!this.presMap) this.presMap = {};
+        for (const pk of Object.keys(this.presMap)) {
+          if (now2 - this.presMap[pk] > 18e4) delete this.presMap[pk];
+        }
+        if (pid) {
+          if (d === -1) delete this.presMap[pid];
+          else this.presMap[pid] = now2;
+          this.online = Object.keys(this.presMap).length;
+        } else {
+          this.online = Math.max(0, (this.online || 0) + d);
+        }
         return Response.json({ ok: true, online: this.online });
       } catch (e) {
         return Response.json({ ok: false }, { status: 400 });
@@ -1649,9 +1678,9 @@ async function generateFreeRoomId(db) {
   return String(Date.now()).slice(-6);
 }
 __name(generateFreeRoomId, "generateFreeRoomId");
-async function presenceDelta(env, delta) {  try {
+async function presenceDelta(env, delta, id) {  try {
     const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
-    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta }) });
+    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta, id }) });
     const d = await r.json();
     return d && typeof d.online === "number" ? d.online : null;
   } catch (e) {
@@ -1663,7 +1692,10 @@ __name(presenceDelta, "presenceDelta");
 async function handleWebSocket(ws, env) {
   activeConnections.add(ws);
   ws._presCounted = true;
-  const n = await presenceDelta(env, 1);
+  const presId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  ws._presId = presId;
+  ws._presTimer = setInterval(function () { try { presenceDelta(env, 0, presId); } catch (e) {} }, 6e4);
+  const n = await presenceDelta(env, 1, presId);
   if (typeof n === "number") onlineCount = n;
   else onlineCount++;
   ws._presCounted = true;
@@ -1705,9 +1737,13 @@ async function handleWebSocket(ws, env) {
   };
   const lobbyDetach = () => {
     activeConnections.delete(ws);
+    if (ws._presTimer) {
+      clearInterval(ws._presTimer);
+      ws._presTimer = null;
+    }
     if (ws._presCounted) {
       ws._presCounted = false;
-      presenceDelta(env, -1).then((n) => {
+      presenceDelta(env, -1, ws._presId).then((n) => {
         if (typeof n === "number") {
           onlineCount = n;
           broadcastOnlineCount();
