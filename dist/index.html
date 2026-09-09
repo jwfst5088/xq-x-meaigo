@@ -172,12 +172,12 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 .auth-tabs{display:flex;gap:6px;margin-bottom:10px}
 .auth-tab{flex:1;padding:8px 0;background:transparent;border:1px solid #3d2117;border-radius:8px;color:#8b7355;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .auth-tab.active{background:#3d2117;color:#d4a843;border-color:#d4a843}
-#rvPanel{position:fixed;z-index:150;background:#2c1810;border:1px solid #5a3a28;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);width:480px;max-width:calc(100vw - 20px);box-sizing:border-box}
+#rvPanel{position:fixed;left:50%;top:9vh;z-index:240;background:#2c1810;border:1px solid #5a3a28;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);width:auto;max-width:calc(100vw - 16px);box-sizing:border-box;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
 .rv-head{display:flex;justify-content:space-between;align-items:center}
 .rv-close{background:transparent;border:none;color:#8b7355;font-size:13px;cursor:pointer;padding:2px 6px;font-family:inherit}
 .rv-close:hover{color:#d4a843}
-@media(min-width:1000px){#rvPanel{right:16px;top:60px;width:340px}}
-@media(max-width:999px){#rvPanel{position:static;transform:none;margin:8px auto 10px;width:calc(100% - 16px);max-height:none;overflow:visible}}@media(max-width:999px){body.rv-open .board-wrap{max-height:46vh}}
+@media(min-width:1000px){#rvPanel{width:auto}}
+@media(max-width:999px){#rvPanel{max-height:none;overflow:visible}}
 @media(min-width:1000px){
 .lb-body{flex-direction:row;align-items:flex-start;max-width:1240px;margin:0 auto;gap:24px;padding:0 20px;box-sizing:border-box}
 .lb-main{padding-top:46px}
@@ -6676,7 +6676,7 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<canvas id="rvCurve" width="460" height="110" style="display:none;width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
 +'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
-var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min(_rw.parentNode.clientWidth||300,(window.innerHeight||800)*0.27);_mw=Math.max(_mw,180);_rw.style.width=_mw+'px';_rw.style.marginLeft='auto';_rw.style.marginRight='auto';_rw.style.height=(_mw*10/9)+'px';}window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
+var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min(Math.max((window.innerHeight||800)*0.30,200),420);_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;try{$=window.sessionStorage;}catch(e0){}var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
 var total=snap.moves.length;
@@ -6773,7 +6773,7 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px"></div>'
 +'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
 var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}
-try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min(_rw.parentNode.clientWidth||300,(window.innerHeight||800)*0.27);_mw=Math.max(_mw,180);_rw.style.width=_mw+'px';_rw.style.marginLeft='auto';_rw.style.marginRight='auto';_rw.style.height=(_mw*10/9)+'px';}window._xqRenderRvBoard();}catch(e){}
+try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min(Math.max((window.innerHeight||800)*0.30,200),420);_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;try{$=window.sessionStorage;}catch(e0){}var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._xqRenderRvBoard();}catch(e){}
 try{if(d.plies&&d.plies.length){computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);}else{var st0=$id('rvStatus');if(st0)st0.textContent='分析中…';runAnalysis(d.snap);}}catch(e2){}
 }catch(e){}
 };window._xqRenderRvBoard=function(){
@@ -6842,7 +6842,16 @@ drawBoardBg();render();
 if(typeof D==='function'&&D('turnText')&&typeof engine!=='undefined'&&engine){D('turnText').textContent=engine.winner?(engine.winner==='draw'?'和棋':(engine.winner==='red'?'红方胜':'黑方胜')):'红方走棋';}
 };
 setTimeout(function(){try{if(sessionStorage.getItem('xq_review')&&typeof engine!=='undefined'){window._xqResumeReview();}}catch(e){}},1200);
-})();
+(function(){
+var drag=null,pnl=null;
+function ds(e){pnl=document.getElementById('rvPanel');if(!pnl)return;var t=e.target;if(t&&t.tagName==='BUTTON')return;var r=pnl.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top};pnl.style.cursor='grabbing';if(e.cancelable)e.preventDefault();}
+function dm(e){if(!drag||!pnl)return;var w=pnl.offsetWidth,h=pnl.offsetHeight;var x=Math.min(Math.max(2,e.clientX-drag.dx),Math.max(2,window.innerWidth-w-2));var y=Math.min(Math.max(2,e.clientY-drag.dy),Math.max(2,window.innerHeight-h-2));pnl.style.left=x+'px';pnl.style.top=y+'px';try{sessionStorage.setItem('xq_rvpos',JSON.stringify({x:x,y:y}));}catch(err){}}
+function de(){if(!drag)return;drag=null;if(pnl)pnl.style.cursor='grab';}
+document.addEventListener('pointerdown',ds,true);
+document.addEventListener('pointermove',dm,true);
+document.addEventListener('pointerup',de,true);
+document.addEventListener('pointercancel',de,true);
+})();})();
 </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"0a4ff2af697e451c85fdf620787d507c","r":1}' crossorigin="anonymous"></script>
 </body>
