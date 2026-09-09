@@ -1400,7 +1400,6 @@ function leaveGame(){
 showOverlay('<h2>退出对局</h2><p>确认退出当前对局？</p><div class="btns2"><button class="btn btn-red" onclick="doLeaveGame()">确认退出</button><button class="btn btn-outline" onclick="hideOverlay()">取消</button></div>');
 }
 function returnToLobby(){
-window._xqFinGame=(typeof engine!=='undefined'&&engine&&engine.gameOver)?1:0;
 try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 soundEnabled=false;gameOverSoundPlayed=false;
 if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
@@ -1409,10 +1408,9 @@ gm='local';myCl=null;myRm=null;boardFlip=false;D('drawBtn').style.display='none'
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent=sockOk?'● 服务器已连接':'○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
-try{if(!window._xqFinGame){localStorage.removeItem('xq_game');}sessionStorage.removeItem('xq_game');}catch(e){}
+try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_review');sessionStorage.removeItem('xq_game');}catch(e){}
 }
 function doLeaveGame(){
-window._xqFinGame=(typeof engine!=='undefined'&&engine&&engine.gameOver)?1:0;
 try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')closeReview();}catch(e){}
 if(document.fullscreenElement||document.webkitFullscreenElement){
 if(document.exitFullscreen)document.exitFullscreen();
@@ -1427,7 +1425,7 @@ gm='local';myCl=null;myRm=null;boardFlip=false;D('drawBtn').style.display='none'
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent='○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
-try{if(!window._xqFinGame){localStorage.removeItem('xq_game');}sessionStorage.removeItem('xq_game');}catch(e){}
+try{localStorage.removeItem('xq_game');sessionStorage.removeItem('xq_review');sessionStorage.removeItem('xq_game');}catch(e){}
 connectSocket();
 }
 function leaveGameSilent(){
