@@ -1429,7 +1429,52 @@ async function handleApiRequest(request, env) {
       return json({ ok: false, online: 0 });
     }
   }
-  async function adminToken(dayKey) {
+  if (path === "/api/history/save" && env.CHESS_DB) {
+    try {
+      const body = await request.json();
+      const dev = body && body.deviceId ? String(body.deviceId).slice(0, 64) : "";
+      const moves = body && Array.isArray(body.moves) ? body.moves : null;
+      if (!dev || !moves || !moves.length) return json({ ok: false, error: "bad request" }, 400);
+      const compact = moves.map((m) => [m.fromRow, m.fromCol, m.toRow, m.toCol]);
+      await env.CHESS_DB.prepare(
+        "INSERT INTO game_history (device_id, ts, gm, my_color, winner, moves, move_count) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).bind(dev, Date.now(), String(body.gm || "").slice(0, 16), String(body.myColor || "").slice(0, 8), String(body.winner || "").slice(0, 8), JSON.stringify(compact), compact.length).run();
+      await env.CHESS_DB.prepare(
+        "DELETE FROM game_history WHERE device_id = ? AND id NOT IN (SELECT id FROM game_history WHERE device_id = ? ORDER BY ts DESC, id DESC LIMIT 10)"
+      ).bind(dev, dev).run();
+      return json({ ok: true });
+    } catch (e) {
+      return json({ ok: false }, 500);
+    }
+  }
+  if (path === "/api/history/list" && env.CHESS_DB) {
+    try {
+      const dev = url.searchParams.get("deviceId");
+      if (!dev) return json({ ok: false, error: "deviceId required" }, 400);
+      const r = await env.CHESS_DB.prepare(
+        "SELECT id, ts, gm, my_color, winner, move_count FROM game_history WHERE device_id = ? ORDER BY ts DESC, id DESC LIMIT 10"
+      ).bind(dev.slice(0, 64)).all();
+      return json({ ok: true, games: (r.results || []).slice().reverse() });
+    } catch (e) {
+      return json({ ok: false }, 500);
+    }
+  }
+  if (path === "/api/history/get" && env.CHESS_DB) {
+    try {
+      const gid = parseInt(url.searchParams.get("id"), 10);
+      const dev = url.searchParams.get("deviceId");
+      if (!gid || !dev) return json({ ok: false, error: "bad request" }, 400);
+      const r = await env.CHESS_DB.prepare(
+        "SELECT id, ts, gm, my_color, winner, moves FROM game_history WHERE id = ? AND device_id = ?"
+      ).bind(gid, dev.slice(0, 64)).first();
+      if (!r) return json({ ok: false, error: "not found" }, 404);
+      let mv = [];
+      try { mv = JSON.parse(r.moves).map((a) => ({ fromRow: a[0], fromCol: a[1], toRow: a[2], toCol: a[3] })); } catch (e2) {}
+      return json({ ok: true, game: { id: r.id, ts: r.ts, gm: r.gm, myCl: r.my_color, winner: r.winner, moves: mv } });
+    } catch (e) {
+      return json({ ok: false }, 500);
+    }
+  }  async function adminToken(dayKey) {
     const data = new TextEncoder().encode("xq-admin-123456-" + dayKey);
     const buf = await crypto.subtle.digest("SHA-256", data);
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

@@ -6643,7 +6643,7 @@ var ok=(typeof gm!=='undefined')&&(gm==='online'||gm==='ai'||gm==='pikafish'||gm
 var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];
 window._reviewSnapshot=(ok&&mv.length>=4)?{moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine)?engine.winner:null,gm:gm}:null;
 }catch(e){window._reviewSnapshot=null;}
-try{if(window._reviewSnapshot){var _h=[];try{_h=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e1){}_h.push({ts:Date.now(),moves:window._reviewSnapshot.moves,myCl:window._reviewSnapshot.myCl,winner:window._reviewSnapshot.winner,gm:window._reviewSnapshot.gm});while(_h.length>20)_h.shift();localStorage.setItem('xq_history',JSON.stringify(_h));}}catch(e2){}
+try{if(window._reviewSnapshot){var _h=[];try{_h=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e1){}_h.push({ts:Date.now(),moves:window._reviewSnapshot.moves,myCl:window._reviewSnapshot.myCl,winner:window._reviewSnapshot.winner,gm:window._reviewSnapshot.gm});while(_h.length>10)_h.shift();localStorage.setItem('xq_history',JSON.stringify(_h));try{var _idf2=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId:_idf2.deviceId||'',gm:window._reviewSnapshot.gm,myColor:window._reviewSnapshot.myCl,winner:window._reviewSnapshot.winner,moves:window._reviewSnapshot.moves})}).catch(function(e4){});}catch(e3){}}}catch(e2){}
 _origSGO(wt);
 try{
 if(window._reviewSnapshot){
@@ -6664,7 +6664,7 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 window.openReview=function(){
 var snap=window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
-window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;try{var _h0=JSON.parse(localStorage.getItem('xq_history')||'[]');window._rvGameIdx=_h0.length?_h0.length-1:null;}catch(e0){window._rvGameIdx=null;}
+window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;try{var _h0=JSON.parse(localStorage.getItem('xq_history')||'[]');window._rvGameIdx=_h0.length?_h0.length-1:null;}catch(e0){window._rvGameIdx=null;}try{var _idf0=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf0.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;window._rvGameIdxSrv=null;}}).catch(function(){});}catch(e5){}
 try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:null,idx:0}));}catch(e){}window._rvSavedEngine=null;
 hideOverlay();
 var old=$id('rvPanel');if(old)old.remove();
@@ -6806,7 +6806,18 @@ el.appendChild(d);}
 }catch(e){}
 };window.rvGame=function(dir){
 try{
-var hist=[];try{hist=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e){}
+if(window._histSrv&&window._histSrv.length){
+if(window._rvGameIdxSrv==null){window._rvGameIdxSrv=window._histSrv.length-1;}
+var sidx=window._rvGameIdxSrv+dir;
+if(sidx<0){toast('已经是最早一局');return;}
+if(sidx>window._histSrv.length-1){toast('已经是最近一局');return;}
+var meta=window._histSrv[sidx];window._rvGameIdxSrv=sidx;window._rvGameIdx=null;
+window._rvPlies=null;window._rvIdx=-1;window._rvEngine=null;window._rvLastMove=null;window._xqRenderRvBoard();
+var _idf=(window._xqIdentityFields&&window._xqIdentityFields())||{};
+fetch('/api/history/get?id='+meta.id+'&deviceId='+encodeURIComponent(_idf.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.game&&d.game.moves&&d.game.moves.length){window._rvSnap={moves:d.game.moves,myCl:d.game.myCl,winner:d.game.winner,gm:d.game.gm};try{sessionStorage.setItem('xq_review',JSON.stringify({snap:window._rvSnap,plies:null,idx:0}))}catch(e){}if($id('rvPanel'))runAnalysis(window._rvSnap);}else{toast('棋谱加载失败');}}).catch(function(){toast('棋谱加载失败');});
+return;
+}
+var hist=[];try{hist=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e){}try{hist=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e){}
 if(!hist||!hist.length){toast('暂无历史对局');return;}
 if(window._rvGameIdx==null){window._rvGameIdx=hist.length-1;}
 var idx=window._rvGameIdx+dir;
