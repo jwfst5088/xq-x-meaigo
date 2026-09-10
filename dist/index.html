@@ -6643,6 +6643,7 @@ var ok=(typeof gm!=='undefined')&&(gm==='online'||gm==='ai'||gm==='pikafish'||gm
 var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];
 window._reviewSnapshot=(ok&&mv.length>=4)?{moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine)?engine.winner:null,gm:gm}:null;
 }catch(e){window._reviewSnapshot=null;}
+try{if(window._reviewSnapshot){var _h=[];try{_h=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e1){}_h.push({ts:Date.now(),moves:window._reviewSnapshot.moves,myCl:window._reviewSnapshot.myCl,winner:window._reviewSnapshot.winner,gm:window._reviewSnapshot.gm});while(_h.length>20)_h.shift();localStorage.setItem('xq_history',JSON.stringify(_h));}}catch(e2){}
 _origSGO(wt);
 try{
 if(window._reviewSnapshot){
@@ -6663,7 +6664,7 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 window.openReview=function(){
 var snap=window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
-window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;
+window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;try{var _h0=JSON.parse(localStorage.getItem('xq_history')||'[]');window._rvGameIdx=_h0.length?_h0.length-1:null;}catch(e0){window._rvGameIdx=null;}
 try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:null,idx:0}));}catch(e){}window._rvSavedEngine=null;
 hideOverlay();
 var old=$id('rvPanel');if(old)old.remove();
@@ -6673,7 +6674,7 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvStatus" style="display:none;font-size:12px;color:#d4a843;margin:4px 0">引擎准备中…</div>'
 +'<canvas id="rvCurve" width="460" height="110" style="display:none;width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
-+'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
++'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(-1)">⬅ 上一局</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(1)">下一局 ➡</button></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
 var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min((window.innerHeight||800)*0.45,(window.innerWidth||400)-32,560);_mw=Math.max(_mw,240);_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;try{$=window.sessionStorage;}catch(e0){}var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
@@ -6769,7 +6770,7 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvStatus" style="display:none;font-size:12px;color:#4caf50;margin:4px 0">✅ 复盘已恢复</div>'
 +'<canvas id="rvCurve" width="460" height="110" style="display:none;width:100%;background:#120a06;border-radius:6px;border:1px solid #3d2117"></canvas>'
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px"></div>'
-+'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
++'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(-1)">⬅ 上一局</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(1)">下一局 ➡</button></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button></div>';
 var _bw=document.querySelector('.board-wrap');if(_bw&&_bw.parentNode){_bw.parentNode.insertBefore(pnl,_bw.nextSibling);}else{document.body.appendChild(pnl);}
 try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mw=Math.min((window.innerHeight||800)*0.45,(window.innerWidth||400)-32,560);_mw=Math.max(_mw,240);_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;try{$=window.sessionStorage;}catch(e0){}var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._xqRenderRvBoard();}catch(e){}
 try{if(d.plies&&d.plies.length){computeDrops(d.plies);drawCurve(d.plies);showRvPly(window._rvIdx);}else{var st0=$id('rvStatus');if(st0)st0.textContent='分析中…';runAnalysis(d.snap);}}catch(e2){}
@@ -6802,6 +6803,24 @@ d.className='piece '+(p.color==='red'?'red-p':'blk-p')+(lm&&lm.row===r2&&lm.col=
 d.style.width=(rcs*0.86)+'px';d.style.height=(rcs*0.86)+'px';d.style.fontSize=(rcs*0.45)+'px';d.style.lineHeight=(rcs*0.86)+'px';d.style.left=x+'px';d.style.top=y+'px';
 d.textContent=PN[p.type][p.color];
 el.appendChild(d);}
+}catch(e){}
+};window.rvGame=function(dir){
+try{
+var hist=[];try{hist=JSON.parse(localStorage.getItem('xq_history')||'[]')}catch(e){}
+if(!hist||!hist.length){toast('暂无历史对局');return;}
+if(window._rvGameIdx==null){window._rvGameIdx=hist.length-1;}
+var idx=window._rvGameIdx+dir;
+if(idx<0){toast('已经是最早一局');return;}
+if(idx>hist.length-1){toast('已经是最近一局');return;}
+var g=hist[idx];
+if(!g||!g.moves||!g.moves.length){toast('该局无棋谱');return;}
+window._rvGameIdx=idx;
+window._rvSnap={moves:g.moves,myCl:g.myCl,winner:g.winner,gm:g.gm};
+window._rvPlies=null;window._rvIdx=-1;window._rvEngine=null;window._rvLastMove=null;
+try{sessionStorage.setItem('xq_review',JSON.stringify({snap:window._rvSnap,plies:null,idx:0}))}catch(e){}
+window._xqRenderRvBoard();
+if(!$id('rvPanel'))return;
+runAnalysis(window._rvSnap);
 }catch(e){}
 };window.showRvPly=function(i){
 var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
