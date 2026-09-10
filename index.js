@@ -1667,6 +1667,22 @@ var index_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path === "/socket.io/") {
+      const tr = url.searchParams.get("transport");
+      const sid = url.searchParams.get("sid");
+      if (tr === "polling" && sid) {
+        try {
+          const pkey = "P:" + String(sid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+          const nowMs = Date.now();
+          if (!globalThis.__presTh) globalThis.__presTh = {};
+          const th = globalThis.__presTh;
+          if (!th[pkey] || nowMs - th[pkey] > 2e4) {
+            th[pkey] = nowMs;
+            presenceDelta(env, 0, pkey).then(function (n) { if (typeof n === "number") onlineCount = n; }).catch(function () {});
+          }
+        } catch (e) {}
+      }
+    }
     if (path.startsWith("/api/")) {
       return await handleApiRequest(request, env);
     }
@@ -1681,7 +1697,7 @@ var index_default = {
       if (!roomId) {
         const [client, server] = Object.values(new WebSocketPair());
         server.accept();
-        handleWebSocket(server, env);
+        handleWebSocket(server, env, url);
         return new Response(null, { status: 101, webSocket: client });
       }
       const roomDO = env.CHESS_ROOM.idFromName(roomId);
@@ -1734,10 +1750,15 @@ async function presenceDelta(env, delta, id) {  try {
 }
 __name(presenceDelta, "presenceDelta");
 
-async function handleWebSocket(ws, env) {
+async function handleWebSocket(ws, env, wsUrl) {
   activeConnections.add(ws);
   ws._presCounted = true;
-  const presId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  let presId = null;
+  try {
+    const wsSid = wsUrl && wsUrl.searchParams ? wsUrl.searchParams.get("sid") : null;
+    if (wsSid) presId = "P:" + String(wsSid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+  } catch (e) {}
+  if (!presId) presId = "W:" + Math.random().toString(36).slice(2) + Date.now().toString(36);
   ws._presId = presId;
   ws._presTimer = setInterval(function () { try { presenceDelta(env, 0, presId); } catch (e) {} }, 6e4);
   const n = await presenceDelta(env, 1, presId);

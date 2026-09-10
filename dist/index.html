@@ -6519,7 +6519,7 @@ var h='<table style="width:100%;border-collapse:collapse">';
 h+='<tr style="color:#d4a843"><td style="padding:2px">#</td><td>棋手</td><td>战绩</td></tr>';
 r.list.forEach(function(p){
 var medal=p.rank===1?'🥇':p.rank===2?'🥈':p.rank===3?'🥉':p.rank;
-h+='<tr style="border-top:1px solid #3d2117"><td style="padding:3px 2px">'+medal+'</td><td>'+esc(p.name)+'</td><td style="color:#8b7355;font-size:11px">'+p.wins+'胜'+p.losses+'负'+(p.draws?'+'+p.draws:'')+'</td></tr>';
+h+='<tr style="border-top:1px solid #3d2117"><td style="padding:3px 2px">'+medal+'</td><td>'+esc(p.name)+'</td><td style="color:#8b7355;font-size:11px">'+p.wins+'胜 '+p.losses+'负 '+(p.draws||0)+'和'+'</td></tr>';
 });
 h+='</table>';
 lst.innerHTML=h;
