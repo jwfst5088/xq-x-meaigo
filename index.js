@@ -286,22 +286,9 @@ var ChessRoom = class {
     }
     return new Response("Not found", { status: 404 });
   }
-  _presenceDelta(delta, id) {
-    try {
-      if (!this.env || !this.env.MATCH_QUEUE || !id) return;
-      const stub = this.env.MATCH_QUEUE.get(this.env.MATCH_QUEUE.idFromName("global"));
-      stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta, id }) }).catch(() => {});
-    } catch (e) {}
-  }  handleRoomWebSocket(ws) {
+  handleRoomWebSocket(ws) {
     const socketData = { color: null, spectator: false, replaced: false };
     ws._socketData = socketData;
-    socketData.presId = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    this._presenceDelta(1, socketData.presId);
-    ws.addEventListener("close", () => {
-      try {
-        this._presenceDelta(-1, socketData.presId);
-      } catch (e) {}
-    });
     ws._lastSeen = Date.now();
     let heartbeatTimer = null;
     let heartbeatTimeout = null;
@@ -315,10 +302,6 @@ var ChessRoom = class {
         try {
           ws.send(JSON.stringify({ event: "ping" }));
         } catch (e) {
-        }
-        try {
-          this._presenceDelta(0, socketData.presId);
-        } catch (e2) {
         }
         heartbeatTimeout = setTimeout(() => {
           try {
@@ -1275,19 +1258,7 @@ const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
       try {
         const body = await request.json();
         const d = body && typeof body.delta === "number" ? body.delta : 0;
-        const pid = body && body.id ? String(body.id).slice(0, 64) : null;
-        const now2 = Date.now();
-        if (!this.presMap) this.presMap = {};
-        for (const pk of Object.keys(this.presMap)) {
-          if (now2 - this.presMap[pk] > 18e4) delete this.presMap[pk];
-        }
-        if (pid) {
-          if (d === -1) delete this.presMap[pid];
-          else this.presMap[pid] = now2;
-          this.online = Object.keys(this.presMap).length;
-        } else {
-          this.online = Math.max(0, (this.online || 0) + d);
-        }
+        this.online = Math.max(0, (this.online || 0) + d);
         return Response.json({ ok: true, online: this.online });
       } catch (e) {
         return Response.json({ ok: false }, { status: 400 });
@@ -1429,52 +1400,7 @@ async function handleApiRequest(request, env) {
       return json({ ok: false, online: 0 });
     }
   }
-  if (path === "/api/history/save" && env.CHESS_DB) {
-    try {
-      const body = await request.json();
-      const dev = body && body.deviceId ? String(body.deviceId).slice(0, 64) : "";
-      const moves = body && Array.isArray(body.moves) ? body.moves : null;
-      if (!dev || !moves || !moves.length) return json({ ok: false, error: "bad request" }, 400);
-      const compact = moves.map((m) => [m.fromRow, m.fromCol, m.toRow, m.toCol]);
-      await env.CHESS_DB.prepare(
-        "INSERT INTO game_history (device_id, ts, gm, my_color, winner, moves, move_count) VALUES (?, ?, ?, ?, ?, ?, ?)"
-      ).bind(dev, Date.now(), String(body.gm || "").slice(0, 16), String(body.myColor || "").slice(0, 8), String(body.winner || "").slice(0, 8), JSON.stringify(compact), compact.length).run();
-      await env.CHESS_DB.prepare(
-        "DELETE FROM game_history WHERE device_id = ? AND id NOT IN (SELECT id FROM game_history WHERE device_id = ? ORDER BY ts DESC, id DESC LIMIT 10)"
-      ).bind(dev, dev).run();
-      return json({ ok: true });
-    } catch (e) {
-      return json({ ok: false }, 500);
-    }
-  }
-  if (path === "/api/history/list" && env.CHESS_DB) {
-    try {
-      const dev = url.searchParams.get("deviceId");
-      if (!dev) return json({ ok: false, error: "deviceId required" }, 400);
-      const r = await env.CHESS_DB.prepare(
-        "SELECT id, ts, gm, my_color, winner, move_count FROM game_history WHERE device_id = ? ORDER BY ts DESC, id DESC LIMIT 10"
-      ).bind(dev.slice(0, 64)).all();
-      return json({ ok: true, games: (r.results || []).slice().reverse() });
-    } catch (e) {
-      return json({ ok: false }, 500);
-    }
-  }
-  if (path === "/api/history/get" && env.CHESS_DB) {
-    try {
-      const gid = parseInt(url.searchParams.get("id"), 10);
-      const dev = url.searchParams.get("deviceId");
-      if (!gid || !dev) return json({ ok: false, error: "bad request" }, 400);
-      const r = await env.CHESS_DB.prepare(
-        "SELECT id, ts, gm, my_color, winner, moves FROM game_history WHERE id = ? AND device_id = ?"
-      ).bind(gid, dev.slice(0, 64)).first();
-      if (!r) return json({ ok: false, error: "not found" }, 404);
-      let mv = [];
-      try { mv = JSON.parse(r.moves).map((a) => ({ fromRow: a[0], fromCol: a[1], toRow: a[2], toCol: a[3] })); } catch (e2) {}
-      return json({ ok: true, game: { id: r.id, ts: r.ts, gm: r.gm, myCl: r.my_color, winner: r.winner, moves: mv } });
-    } catch (e) {
-      return json({ ok: false }, 500);
-    }
-  }  async function adminToken(dayKey) {
+  async function adminToken(dayKey) {
     const data = new TextEncoder().encode("xq-admin-123456-" + dayKey);
     const buf = await crypto.subtle.digest("SHA-256", data);
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -1667,22 +1593,6 @@ var index_default = {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    if (path === "/socket.io/") {
-      const tr = url.searchParams.get("transport");
-      const sid = url.searchParams.get("sid");
-      if (tr === "polling" && sid) {
-        try {
-          const pkey = "P:" + String(sid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
-          const nowMs = Date.now();
-          if (!globalThis.__presTh) globalThis.__presTh = {};
-          const th = globalThis.__presTh;
-          if (!th[pkey] || nowMs - th[pkey] > 2e4) {
-            th[pkey] = nowMs;
-            presenceDelta(env, 0, pkey).then(function (n) { if (typeof n === "number") onlineCount = n; }).catch(function () {});
-          }
-        } catch (e) {}
-      }
-    }
     if (path.startsWith("/api/")) {
       return await handleApiRequest(request, env);
     }
@@ -1697,7 +1607,7 @@ var index_default = {
       if (!roomId) {
         const [client, server] = Object.values(new WebSocketPair());
         server.accept();
-        handleWebSocket(server, env, url);
+        handleWebSocket(server, env);
         return new Response(null, { status: 101, webSocket: client });
       }
       const roomDO = env.CHESS_ROOM.idFromName(roomId);
@@ -1739,9 +1649,9 @@ async function generateFreeRoomId(db) {
   return String(Date.now()).slice(-6);
 }
 __name(generateFreeRoomId, "generateFreeRoomId");
-async function presenceDelta(env, delta, id) {  try {
+async function presenceDelta(env, delta) {  try {
     const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
-    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta, id }) });
+    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify({ delta }) });
     const d = await r.json();
     return d && typeof d.online === "number" ? d.online : null;
   } catch (e) {
@@ -1750,18 +1660,10 @@ async function presenceDelta(env, delta, id) {  try {
 }
 __name(presenceDelta, "presenceDelta");
 
-async function handleWebSocket(ws, env, wsUrl) {
+async function handleWebSocket(ws, env) {
   activeConnections.add(ws);
   ws._presCounted = true;
-  let presId = null;
-  try {
-    const wsSid = wsUrl && wsUrl.searchParams ? wsUrl.searchParams.get("sid") : null;
-    if (wsSid) presId = "P:" + String(wsSid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
-  } catch (e) {}
-  if (!presId) presId = "W:" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  ws._presId = presId;
-  ws._presTimer = setInterval(function () { try { presenceDelta(env, 0, presId); } catch (e) {} }, 6e4);
-  const n = await presenceDelta(env, 1, presId);
+  const n = await presenceDelta(env, 1);
   if (typeof n === "number") onlineCount = n;
   else onlineCount++;
   ws._presCounted = true;
@@ -1803,13 +1705,9 @@ async function handleWebSocket(ws, env, wsUrl) {
   };
   const lobbyDetach = () => {
     activeConnections.delete(ws);
-    if (ws._presTimer) {
-      clearInterval(ws._presTimer);
-      ws._presTimer = null;
-    }
     if (ws._presCounted) {
       ws._presCounted = false;
-      presenceDelta(env, -1, ws._presId).then((n) => {
+      presenceDelta(env, -1).then((n) => {
         if (typeof n === "number") {
           onlineCount = n;
           broadcastOnlineCount();
