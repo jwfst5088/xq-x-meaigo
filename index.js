@@ -1391,14 +1391,8 @@ async function handleApiRequest(request, env) {
       return json({ error: "match unavailable" }, 503);
     }
   }
-  if (path === "/api/online" && env.MATCH_QUEUE) {
-    try {
-      const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
-      const resp = await stub.fetch("https://do/online");
-      return json(await resp.json());
-    } catch (e) {
-      return json({ ok: false, online: 0 });
-    }
+  if (path === "/api/online") {
+    return json({ online: onlineCount, count: onlineCount });
   }
   if (path === "/api/history/save" && env.CHESS_DB) {
     try {
@@ -1707,11 +1701,7 @@ __name(presenceDelta, "presenceDelta");
 
 async function handleWebSocket(ws, env) {
   activeConnections.add(ws);
-  ws._presCounted = true;
-  const n = await presenceDelta(env, 1);
-  if (typeof n === "number") onlineCount = n;
-  else onlineCount++;
-  ws._presCounted = true;
+  onlineCount++;
   ws.send(JSON.stringify({ event: "online_count", data: onlineCount }));
   broadcastOnlineCount();
   let socketData = { roomId: null, color: null, spectator: false };
@@ -1749,15 +1739,9 @@ async function handleWebSocket(ws, env) {
     }
   };
   const lobbyDetach = () => {
-    activeConnections.delete(ws);
-    if (ws._presCounted) {
-      ws._presCounted = false;
-      presenceDelta(env, -1).then((n) => {
-        if (typeof n === "number") {
-          onlineCount = n;
-          broadcastOnlineCount();
-        }
-      }).catch(() => {});
+    if (activeConnections.delete(ws)) {
+      onlineCount--;
+      broadcastOnlineCount();
     }
   };
   ws.onclose = lobbyDetach;
