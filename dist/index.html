@@ -6777,34 +6777,35 @@ try{if(d.plies&&d.plies.length){computeDrops(d.plies);drawCurve(d.plies);showRvP
 }catch(e){}
 };window._xqRenderRvBoard=function(){
 try{
-var el=$id('rvBoard');if(!el)return;var PN={king:{red:'帅',black:'将'},advisor:{red:'仕',black:'士'},elephant:{red:'相',black:'象'},horse:{red:'馬',black:'馬'},rook:{red:'車',black:'車'},cannon:{red:'炮',black:'砲'},pawn:{red:'兵',black:'卒'}};
+var el=$id('rvBoard');if(!el)return;
 var w=el.clientWidth||el.parentNode.clientWidth||300;if(w<=0)w=300;
-var ps=w*0.04,rcs=(w-ps*2)/8,fl=(typeof boardFlip!=='undefined'&&boardFlip);
-var cv=$id('rvBg');if(cv){
+var PN={king:{red:'帅',black:'将'},advisor:{red:'仕',black:'士'},elephant:{red:'相',black:'象'},horse:{red:'馬',black:'馬'},rook:{red:'車',black:'車'},cannon:{red:'炮',black:'砲'},pawn:{red:'兵',black:'卒'}};
+var cv=$id('rvBg');if(!cv)return;
 var hh=w*10/9;el.style.height=hh+'px';
 var dpr=window.devicePixelRatio||1;cv.width=w*dpr;cv.height=hh*dpr;cv.style.width=w+'px';cv.style.height=hh+'px';
 var ctx=cv.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.scale(dpr,dpr);
-var bw=w-ps*2,bh=hh-ps*2;
+var ps=w*0.04,bw=w-ps*2,bh=hh-ps*2,cs=bw/8;
 var wood=ctx.createLinearGradient(0,ps,0,ps+bh);wood.addColorStop(0,'#c28e56');wood.addColorStop(0.5,'#e8c99a');wood.addColorStop(1,'#e0b383');
-ctx.fillStyle='#d4a56a';ctx.fillRect(ps-rcs*0.1,ps-rcs*0.1,bw+rcs*0.2,bh+rcs*0.2);
+ctx.fillStyle='#d4a56a';ctx.fillRect(ps-cs*0.1,ps-cs*0.1,bw+cs*0.2,bh+cs*0.2);
 ctx.fillStyle=wood;ctx.fillRect(ps,ps,bw,bh);
-ctx.strokeStyle='#9c7550';ctx.lineWidth=1.2;
+ctx.strokeStyle='#9c7550';ctx.lineWidth=1.5;
 for(var r=0;r<10;r++){var y=ps+r*(bh/9);ctx.beginPath();ctx.moveTo(ps,y);ctx.lineTo(ps+bw,y);ctx.stroke();}
-for(var c=0;c<9;c++){if(c===0||c===8){var x2=ps+c*(bw/8);ctx.beginPath();ctx.moveTo(x2,ps);ctx.lineTo(x2,ps+bh);ctx.stroke();}else{var x3=ps+c*(bw/8);ctx.beginPath();ctx.moveTo(x3,ps);ctx.lineTo(x3,ps+4*(bh/9));ctx.stroke();ctx.beginPath();ctx.moveTo(x3,ps+5*(bh/9));ctx.lineTo(x3,ps+bh);ctx.stroke();}}
-ctx.beginPath();ctx.moveTo(ps,ps+4*(bh/9));ctx.lineTo(ps+3*(bw/8),ps);ctx.moveTo(ps+5*(bw/8),ps);ctx.lineTo(ps+bw,ps+4*(bh/9));ctx.moveTo(ps,ps+5*(bh/9));ctx.lineTo(ps+3*(bw/8),ps+bh);ctx.moveTo(ps+5*(bw/8),ps+5*(bh/9));ctx.lineTo(ps+bw,ps+bh);ctx.stroke();
-}
-el.querySelectorAll('.piece').forEach(function(e){e.remove();});
+for(var c=0;c<9;c++){var x=ps+c*cs;if(c===0||c===8){ctx.beginPath();ctx.moveTo(x,ps);ctx.lineTo(x,ps+bh);ctx.stroke();}else{ctx.beginPath();ctx.moveTo(x,ps);ctx.lineTo(x,ps+4*(bh/9));ctx.stroke();ctx.beginPath();ctx.moveTo(x,ps+5*(bh/9));ctx.lineTo(x,ps+bh);ctx.stroke();}}
+ctx.beginPath();ctx.moveTo(ps,ps+4*(bh/9));ctx.lineTo(ps+3*cs,ps);ctx.moveTo(ps+5*cs,ps);ctx.lineTo(ps+bw,ps+4*(bh/9));ctx.moveTo(ps,ps+5*(bh/9));ctx.lineTo(ps+3*cs,ps+bh);ctx.moveTo(ps+5*cs,ps+5*(bh/9));ctx.lineTo(ps+bw,ps+bh);ctx.stroke();
 var rev=window._rvEngine;if(!rev)return;
-var lm=window._rvLastMove;
+var fl=(typeof boardFlip!=='undefined'&&boardFlip);
 for(var r2=0;r2<10;r2++)for(var c2=0;c2<9;c2++){var p=rev.board[r2][c2];if(!p)continue;
-var rr=fl?9-r2:r2;var x=ps+c2*rcs,y=ps+rr*rcs;
-var d=document.createElement('div');
-d.className='piece '+(p.color==='red'?'red-p':'blk-p')+(lm&&lm.row===r2&&lm.col===c2?' last-move':'');
-d.style.width=(rcs*0.86)+'px';d.style.height=(rcs*0.86)+'px';d.style.fontSize=(rcs*0.45)+'px';d.style.lineHeight=(rcs*0.86)+'px';d.style.left=x+'px';d.style.top=y+'px';
-d.textContent=PN[p.type][p.color];
-el.appendChild(d);}
-}catch(e){}
-};window.rvGame=function(dir){
+var rr=fl?9-r2:r2;var cx=ps+c2*cs,cy2=ps+rr*(bh/9);var rad=cs*0.44;
+var g2=ctx.createRadialGradient(cx-rad*0.35,cy2-rad*0.45,rad*0.15,cx,cy2,rad);
+g2.addColorStop(0,'#f5e4c0');g2.addColorStop(0.45,'#d4a860');g2.addColorStop(1,'#906030');
+ctx.beginPath();ctx.arc(cx,cy2,rad,0,Math.PI*2);ctx.fillStyle=g2;ctx.fill();
+ctx.lineWidth=1.5;ctx.strokeStyle='#8b4513';ctx.stroke();
+ctx.fillStyle=(p.color==='red')?'#8b0000':'#1a1a1a';
+ctx.font='900 '+Math.floor(rad*1.02)+'px "Microsoft YaHei",serif';ctx.textAlign='center';ctx.textBaseline='middle';
+ctx.fillText(PN[p.type][p.color],cx,cy2+rad*0.05);
+}}catch(e){}
+};
+window.rvGame=function(dir){
 try{
 if(window._histSrv&&window._histSrv.length){
 if(window._rvGameIdxSrv==null){window._rvGameIdxSrv=window._histSrv.length-1;}
