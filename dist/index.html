@@ -211,7 +211,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="join"><input id="roomInput" placeholder="输入房间号加入" maxlength="6" autocomplete="off" onkeydown="if(event.key==='Enter')joinRoom()"><button class="btn btn-outline" style="width:auto;flex-shrink:0" onclick="joinRoom()">加入房间</button></div>
 </div>
 <div class="mode-cards">
-<div class="mode-card" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈初级</div><div class="mc-desc">入门练习 · 不计分</div></div>
+<div class="mode-card" id="aiEasyCard" style="display:none" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈初级</div><div class="mc-desc">入门练习 · 不计分</div></div>
 <div class="mode-card" onclick="startPikafishGame()"><div class="mc-icon">🧠</div><div class="mc-name">人机对弈高级</div><div class="mc-desc">专业引擎 · 高强度</div></div>
 <div class="mode-card" id="trainCard" style="display:none" onclick="toggleTrainPanel()"><div class="mc-icon">⚙️</div><div class="mc-name">AI快速训练</div><div class="mc-desc" id="trainStats">累计训练：0局</div></div>
 </div>
@@ -6439,6 +6439,7 @@ if(el)el.textContent='当前在线: '+n+' 人';
 try{
 var tc=$id('trainCard');
 if(tc&&localStorage.getItem('xq_admin_token'))tc.style.display='';
+var ae=$id('aiEasyCard');if(ae&&localStorage.getItem('xq_admin_token'))ae.style.display='';
 }catch(e){}
 
 // ---------- 等级分变更提示 + 座位名字显示 ----------
