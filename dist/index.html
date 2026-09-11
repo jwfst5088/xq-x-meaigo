@@ -1524,7 +1524,7 @@ try{
 if(typeof io==='undefined'){D('lobbyStatus').textContent='○ 服务器离线（本地模式可用）';sockOk=false;return;}
 if(socket){try{socket.disconnect();}catch(e){}socket=null;}
 socket=io({transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:1000,timeout:8000,pingTimeout:8000,pingInterval:4000,randomizationFactor:0});
-socket.on('connect',function(){sockOk=true;D('lobbyStatus').textContent='● 服务器已连接';D('footerText').textContent='人机对弈需联网 | 在线模式两人对战';
+socket.on('connect',function(){sockOk=true;try{var _pd=null;try{_pd=localStorage.getItem('xq_device_id');}catch(eP){}socket.emit('presence',{deviceId:_pd});}catch(e0){}D('lobbyStatus').textContent='● 服务器已连接';D('footerText').textContent='人机对弈需联网 | 在线模式两人对战';
 hideReconnecting();
 var isPageReload=!!window._pendingReconnect;
 if(window._pendingRoomAction&&socket.roomId){var pa=window._pendingRoomAction;window._pendingRoomAction=null;

@@ -5,6 +5,7 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 // src/index.js
 var activeConnections = /* @__PURE__ */ new Set();
 var onlineCount = 0;
+var activeDevices = /* @__PURE__ */ new Map();
 var aiWeights = {
   attackKing: 70,
   limitKingMob: 35,
@@ -1710,7 +1711,21 @@ async function handleWebSocket(ws, env) {
       const data = JSON.parse(event.data);
       const eventName = data.event || data[0];
       const payload = data.payload || data[1];
-      if (eventName === "create_room") {
+      if (eventName === "presence") {
+        const dev = payload && typeof payload.deviceId === "string" ? payload.deviceId : null;
+        if (dev && !ws._deviceId) {
+          ws._deviceId = dev;
+          let dset = activeDevices.get(dev);
+          if (!dset) {
+            dset = new Set();
+            activeDevices.set(dev, dset);
+          } else {
+            onlineCount--; // 同设备多连接: 抵消连接级+1
+          }
+          dset.add(ws);
+          broadcastOnlineCount();
+        }
+      } else if (eventName === "create_room") {
         let lastColor = null;
         let requestedRoomId = null;
         if (payload && typeof payload === "object") {
@@ -1740,7 +1755,22 @@ async function handleWebSocket(ws, env) {
   };
   const lobbyDetach = () => {
     if (activeConnections.delete(ws)) {
-      onlineCount--;
+      const dev = ws._deviceId;
+      let dec = true;
+      if (dev) {
+        const dset = activeDevices.get(dev);
+        if (dset) {
+          dset.delete(ws);
+          if (dset.size > 0) {
+            dec = false;
+          } else {
+            activeDevices.delete(dev);
+          }
+        }
+      }
+      if (dec) {
+        onlineCount--;
+      }
       broadcastOnlineCount();
     }
   };
