@@ -655,7 +655,8 @@ var ChessRoom = class {
                 const holderDead = hws.readyState !== 1 || (hws._socketData && hws._socketData.replaced);
                 const holderIdle = !hws._lastSeen || Date.now() - hws._lastSeen > 25e3;
                 const preDiscSeat = !!(this.disconnected && this.disconnected[color] && seat.assignedAt && this.disconnected[color] > seat.assignedAt);
-                if (!pidMatches && !holderDead && !holderIdle && !preDiscSeat) {
+                const devPinned = !!(payload.deviceId && this.room.seatIdentity && this.room.seatIdentity[color] && this.room.seatIdentity[color].dev != null && String(this.room.seatIdentity[color].dev) === String(payload.deviceId));
+                if (!pidMatches && !devPinned && !holderDead && !holderIdle && !preDiscSeat) {
                   const alt2 = color === "red" ? "black" : "red";
                   if (isFree(alt2) || isReplaceable(alt2)) {
                     color = alt2;

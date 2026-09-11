@@ -1737,7 +1737,7 @@ selected=null;validMoves=[];
 D('turnText').textContent=gameStarted?(engine.currentTurn==='red'?'红方走棋':'黑方走棋'):'等待对手加入...';
 if(d.redTime!=null){redLeft=d.redTime;blkLeft=d.blkTime;}
 if(gameStarted){stopTimer();if(redLeft<=0||blkLeft<=0){redLeft=900;blkLeft=900;}timerId=setInterval(function(){if(engine.gameOver){stopTimer();return;}if(engine.currentTurn==='red'){redLeft=Math.max(0,redLeft-1);}else{blkLeft=Math.max(0,blkLeft-1);}updateTimers();if(redLeft<=0){stopTimer();engine.gameOver=true;engine.winner='black';sndGameOver();showGameOver('黑方');clearGameState();}else if(blkLeft<=0){stopTimer();engine.gameOver=true;engine.winner='red';sndGameOver();showGameOver('红方');clearGameState();}},1000);updateTimers();}
-requestAnimationFrame(function(){drawBoardBg();render();});
+drawBoardBg();render();requestAnimationFrame(function(){drawBoardBg();render();});
 hideOverlay();hideReconnecting();
 
 saveGameState();
