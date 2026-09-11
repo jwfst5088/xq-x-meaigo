@@ -6777,7 +6777,7 @@ ctx.beginPath();ctx.arc(X(i),Y(mover==='red'?wi:100-wi),4,0,Math.PI*2);ctx.fill(
 window._xqResumeReview=function(){
 try{
 var raw=sessionStorage.getItem('xq_review');if(!raw)return;
-var d=JSON.parse(raw);if(!d||!d.snap||!d.plies||!d.plies.length)return;
+var d=JSON.parse(raw);if(!d||!d.snap)return;
 if($id('rvPanel'))return;
 window._rvSnap=d.snap;window._rvPlies=d.plies;window._rvIdx=(d.idx!=null)?d.idx:0;window._rvSavedEngine=engine;
 var pnl=document.createElement('div');pnl.id='rvPanel';
