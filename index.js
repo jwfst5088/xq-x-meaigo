@@ -5,7 +5,8 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 // src/index.js
 var activeConnections = /* @__PURE__ */ new Set();
 var onlineCount = 0;
-var activeDevices = /* @__PURE__ */ new Map();
+var lastPresenceEnv = null;
+var lastHbAt = 0;
 var aiWeights = {
   attackKing: 70,
   limitKingMob: 35,
@@ -1133,6 +1134,8 @@ var MatchQueue = class {
     this._loaded = false;
     this.events = [];
     this.online = 0;
+    this._pConn = /* @__PURE__ */ new Map();
+    this._pTotal = 0;
   }
   _log(ev, detail) {
     try {
@@ -1259,16 +1262,39 @@ const sorted = [...this.queue].sort((a, b) => a.elo - b.elo);
     if (path === "/presence" && request.method === "POST") {
       try {
         const body = await request.json();
-        const d = body && typeof body.delta === "number" ? body.delta : 0;
-        this.online = Math.max(0, (this.online || 0) + d);
-        return Response.json({ ok: true, online: this.online });
+        const now = Date.now();
+        if (!this._pConn) this._pConn = /* @__PURE__ */ new Map();
+        if (body && typeof body.join === "string") {
+          const pex = this._pConn.get(body.join);
+          this._pConn.set(body.join, { dev: pex ? pex.dev : null, seen: now });
+        } else if (body && typeof body.leave === "string") {
+          this._pConn.delete(body.leave);
+        } else if (body && typeof body.set === "string" && body.deviceId) {
+          const pex2 = this._pConn.get(body.set);
+          if (pex2) pex2.dev = String(body.deviceId).slice(0, 64); else this._pConn.set(body.set, { dev: String(body.deviceId).slice(0, 64), seen: now });
+        } else if (body && Array.isArray(body.heartbeat)) {
+          for (const hit of body.heartbeat) {
+            if (hit && typeof hit.id === "string") {
+              const pc2 = this._pConn.get(hit.id);
+              if (pc2) { pc2.seen = now; if (hit.dev && !pc2.dev) pc2.dev = String(hit.dev).slice(0, 64); } else this._pConn.set(hit.id, { dev: hit.dev ? String(hit.dev).slice(0, 64) : null, seen: now });
+            }
+          }
+        }
+        for (const [pid2, pc5] of [...this._pConn]) { if (now - pc5.seen > 70000) this._pConn.delete(pid2); }
+        const devs = /* @__PURE__ */ new Set();
+        let anon = 0;
+        for (const [, pc4] of this._pConn) { if (pc4.dev) devs.add(pc4.dev); else anon++; }
+        this._pTotal = devs.size + anon;
+        return Response.json({ ok: true, online: this._pTotal });
       } catch (e) {
-        return Response.json({ ok: false }, { status: 400 });
+        return Response.json({ ok: false, online: this._pTotal || 0 });
       }
     }
     if (path === "/debug") {
       const now = Date.now();
-      return Response.json({ ok: true, queueSize: this.queue.length, pairings: this.pairings.size, queue: this.queue.map((e) => ({ dev: String(e.deviceId).slice(0, 6) + "***", name: e.name || null, elo: e.elo, ageSec: Math.floor((now - e.ts) / 1e3), ticket: String(e.ticket).slice(0, 6) })), events: this.events });
+      const _pList = [];
+      if (this._pConn) { for (const [k2, v2] of this._pConn) { _pList.push({ id: k2.slice(0, 6), dev: v2.dev ? v2.dev.slice(0, 8) : null, ageMs: Date.now() - v2.seen }); } }
+      return Response.json({ ok: true, queueSize: this.queue.length, pairings: this.pairings.size, presence: { total: this._pTotal || 0, conns: _pList }, queue: this.queue.map((e) => ({ dev: String(e.deviceId).slice(0, 6) + "***", name: e.name || null, elo: e.elo, ageSec: Math.floor((now - e.ts) / 1e3), ticket: String(e.ticket).slice(0, 6) })), events: this.events });
     }
     return Response.json({ ok: false, error: "unknown" }, { status: 404 });
   }
@@ -1394,6 +1420,8 @@ async function handleApiRequest(request, env) {
     }
   }
   if (path === "/api/online") {
+    const pT3 = await presenceSync(env, { get: true });
+    if (typeof pT3 === "number") onlineCount = pT3;
     return json({ online: onlineCount, count: onlineCount });
   }
   if (path === "/api/history/save" && env.CHESS_DB) {
@@ -1700,10 +1728,27 @@ async function presenceDelta(env, delta) {  try {
   }
 }
 __name(presenceDelta, "presenceDelta");
+async function presenceSync(env, payload) {
+  try {
+    const stub = env.MATCH_QUEUE.get(env.MATCH_QUEUE.idFromName("global"));
+    const r = await stub.fetch("https://do/presence", { method: "POST", body: JSON.stringify(payload) });
+    const d = await r.json();
+    return d && typeof d.online === "number" ? d.online : null;
+  } catch (e) {
+    return null;
+  }
+}
+__name(presenceSync, "presenceSync");
+
 
 async function handleWebSocket(ws, env) {
   activeConnections.add(ws);
-  onlineCount++;
+  ws._connId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  ws._lastSeen = Date.now();
+  ws._env = env;
+  lastPresenceEnv = env;
+  const pT0 = await presenceSync(env, { join: ws._connId });
+  if (typeof pT0 === "number") onlineCount = pT0;
   ws.send(JSON.stringify({ event: "online_count", data: onlineCount }));
   broadcastOnlineCount();
   let socketData = { roomId: null, color: null, spectator: false };
@@ -1714,16 +1759,10 @@ async function handleWebSocket(ws, env) {
       const payload = data.payload || data[1];
       if (eventName === "presence") {
         const dev = payload && typeof payload.deviceId === "string" ? payload.deviceId : null;
-        if (dev && !ws._deviceId) {
+        if (dev && ws._connId && !ws._deviceId) {
           ws._deviceId = dev;
-          let dset = activeDevices.get(dev);
-          if (!dset) {
-            dset = new Set();
-            activeDevices.set(dev, dset);
-          } else {
-            onlineCount--; // 同设备多连接: 抵消连接级+1
-          }
-          dset.add(ws);
+          const pT1 = await presenceSync(env, { set: ws._connId, deviceId: dev });
+          if (typeof pT1 === "number") onlineCount = pT1;
           broadcastOnlineCount();
         }
       } else if (eventName === "create_room") {
@@ -1738,9 +1777,23 @@ async function handleWebSocket(ws, env) {
         const roomId = requestedRoomId || (await generateFreeRoomId(env.CHESS_DB));
         ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
       } else if (eventName === "ping") {
+        ws._lastSeen = Date.now();
         try {
           ws.send(JSON.stringify({ event: "pong" }));
         } catch (e) {
+        }
+        if (Date.now() - (lastHbAt || 0) > 30000) {
+          lastHbAt = Date.now();
+          const hbIds = [];
+          for (const w of activeConnections) { if (w._connId) hbIds.push({ id: w._connId, dev: w._deviceId || null }); }
+          if (hbIds.length) {
+            presenceSync(ws._env || lastPresenceEnv, { heartbeat: hbIds }).then(function(pT4) {
+              if (typeof pT4 === "number") {
+                onlineCount = pT4;
+                broadcastOnlineCount();
+              }
+            });
+          }
         }
       } else if (eventName === "join_room") {
         const roomId = payload && typeof payload === "object" ? payload.roomId : payload;
@@ -1754,28 +1807,16 @@ async function handleWebSocket(ws, env) {
       console.error("WebSocket message error:", e);
     }
   };
-  const lobbyDetach = () => {
+    const lobbyDetach = () => {
     if (activeConnections.delete(ws)) {
-      const dev = ws._deviceId;
-      let dec = true;
-      if (dev) {
-        const dset = activeDevices.get(dev);
-        if (dset) {
-          dset.delete(ws);
-          if (dset.size > 0) {
-            dec = false;
-          } else {
-            activeDevices.delete(dev);
-          }
+      presenceSync(ws._env || lastPresenceEnv, { leave: ws._connId }).then(function(pT2) {
+        if (typeof pT2 === "number") {
+          onlineCount = pT2;
+          broadcastOnlineCount();
         }
-      }
-      if (dec) {
-        onlineCount--;
-      }
-      broadcastOnlineCount();
+      });
     }
-  };
-  ws.onclose = lobbyDetach;
+  }; ws.onclose = lobbyDetach;
   ws.onerror = lobbyDetach;
 }
 __name(handleWebSocket, "handleWebSocket");
