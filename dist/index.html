@@ -281,6 +281,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <button class="btn btn-red" onclick="doResign()">认输</button>
 <button class="btn btn-outline" style="padding:8px 14px;font-size:13px;width:auto;display:none" id="drawBtn" onclick="doDrawReq()">求和</button>
 <button class="btn btn-outline" style="padding:8px 14px;font-size:13px;width:auto" onclick="doUndo()">悔棋</button>
+<button class="btn btn-outline" style="padding:8px 14px;font-size:13px;width:auto" onclick="openLiveReview()">复盘</button>
 <button class="btn btn-outline" style="padding:8px 14px;font-size:13px;width:auto" onclick="leaveGame()">返回</button>
 <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="全屏">⛶</button>
 </div>
@@ -1741,8 +1742,8 @@ hideOverlay();hideReconnecting();
 
 saveGameState();
 });
-socket.on('opponent_left',function(){hideReconnecting();toast('棋局已结束',5000);setTimeout(function(){leaveGameSilent();},5000);});
-socket.on('room_timeout',function(){hideReconnecting();toast('棋局已结束',5000);setTimeout(function(){leaveGameSilent();},5000);});
+socket.on('opponent_left',function(){hideReconnecting();if(document.getElementById('rvPanel')){window._xqPendingLeave=true;try{toast('对手已退出, 可继续复盘',3000);}catch(e7){}return;}toast('棋局已结束',5000);setTimeout(function(){leaveGameSilent();},5000);});
+socket.on('room_timeout',function(){hideReconnecting();if(document.getElementById('rvPanel')){window._xqPendingLeave=true;try{toast('对手已退出, 可继续复盘',3000);}catch(e7){}return;}toast('棋局已结束',5000);setTimeout(function(){leaveGameSilent();},5000);});
 socket.on('draw_requested',function(){showOverlay('<h2>🤝 求和请求</h2><p>对手请求和棋</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:8px 16px;font-size:13px" onclick="accDraw()">同意</button><button class="btn btn-red" onclick="rejDraw()">拒绝</button></div>');});
 socket.on('draw_rejected',function(){toast('对方拒绝了求和');});
 socket.on('rematch_requested',function(){showOverlay('<h2>对方请求再来一局</h2><p>是否同意重新开始？</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="acceptRematch()">同意</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">拒绝并退出</button></div>');});
@@ -6462,13 +6463,16 @@ socket.on('game_over',function(d){
 if(!d||window._goHandled)return;
 if(d.reason==='opponent_left'){
 window._goHandled=true;
-if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
+if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}if(document.getElementById('rvPanel')){window._xqPendingLeave=true;try{toast('对手已退出对局, 你获得胜利, 可继续复盘',3000);}catch(e4){}return;}
 showOverlay('<h2>🏆 对手已退出对局</h2><p>你获得本局胜利，棋力分已结算。</p><p style="color:#9ab">房间即将解散，自动返回大厅…</p><div class="btns2"><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="doLeaveGame()">立即返回大厅</button></div>');
 }
 });
 socket.on('room_closed',function(d){
 if(window._xqRoomClosed)return;
 window._xqRoomClosed=true;
+try{hideReconnecting();}catch(e){}
+if(document.getElementById('rvPanel')){window._xqPendingLeave=true;window._xqRoomClosed=false;try{toast('对手已退出房间, 可继续复盘',3000);}catch(e5){}return;}
+
 try{socket.reconnection=false;}catch(e){}
 try{socket.disconnect();}catch(e){}
 try{hideReconnecting();}catch(e){}
@@ -6670,8 +6674,9 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 }catch(e){}
 };
 }
-window.openReview=function(){
-var snap=window._reviewSnapshot;
+window.openLiveReview=function(){try{var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];if(!mv||!mv.length){toast('还没有可复盘的着法');return;}var cp=JSON.parse(JSON.stringify(mv));var snap={moves:cp,myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine&&engine.gameOver)?engine.winner:null,gm:(typeof gm!=='undefined')?gm:'online'};openReview(snap);}catch(e){}};
+window.openReview=function(snapIn){
+var snap=snapIn||window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
 window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;try{var _h0=JSON.parse(localStorage.getItem('xq_history')||'[]');window._rvGameIdx=_h0.length?_h0.length-1:null;window._rvMIdx=null;}catch(e0){window._rvGameIdx=null;}try{var _idf0=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf0.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;window._rvGameIdxSrv=null;}}).catch(function(){});}catch(e5){}
 try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:null,idx:0}));}catch(e){}window._rvSavedEngine=null;
@@ -6901,6 +6906,7 @@ if(window._rvSavedEngine){engine=window._rvSavedEngine;window._rvSavedEngine=nul
 lastMove=null;selected=null;validMoves=[];
 drawBoardBg();render();
 if(typeof D==='function'&&D('turnText')&&typeof engine!=='undefined'&&engine){D('turnText').textContent=engine.winner?(engine.winner==='draw'?'和棋':(engine.winner==='red'?'红方胜':'黑方胜')):'红方走棋';}
+if(window._xqPendingLeave){window._xqPendingLeave=false;try{if(typeof gm!=='undefined'&&gm==='online'){doLeaveGame();}else{returnToLobby();}}catch(e6){}}
 };
 setTimeout(function(){try{if(sessionStorage.getItem('xq_review')&&typeof engine!=='undefined'){window._xqResumeReview();}}catch(e){}},1200);
 (function(){
