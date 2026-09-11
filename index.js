@@ -1719,7 +1719,7 @@ async function handleWebSocket(ws, env) {
         } else {
           requestedRoomId = payload;
         }
-        const roomId = requestedRoomId || (await generateFreeRoomId(this.env.CHESS_DB));
+        const roomId = requestedRoomId || (await generateFreeRoomId(env.CHESS_DB));
         ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
       } else if (eventName === "ping") {
         try {
