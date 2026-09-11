@@ -6255,8 +6255,8 @@ gm=g.gm;myCl=g.myCl||'red';aiCl=g.aiCl||'black';boardFlip=(myCl==='black');sound
 D('lobby').classList.add('hide');D('game').classList.add('show');
 D('modeBadge').textContent=(g.gm==='pikafish')?'人机对弈高级':'人机对弈';
 D('drawBtn').style.display='none';
-D('redName').textContent=(myCl==='red')?_xqMyName()+'（红方）':'AI（红方）';
-D('blackName').textContent=(myCl==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
+D('redName').textContent=(myCl==='red')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（红方）':'AI（红方）';
+D('blackName').textContent=(myCl==='black')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（黑方）':'AI（黑方）';
 engine.initBoard();
 capRed=[];capBlk=[];lastMove=null;
 if(g.moveHistory){for(var i=0;i<g.moveHistory.length;i++){var m=g.moveHistory[i];var rs=engine.move(m.fromRow,m.fromCol,m.toRow,m.toCol);if(rs&&rs.captured){if(rs.captured.color==='red')capRed.push(rs.captured);else capBlk.push(rs.captured);}}}
@@ -6267,7 +6267,7 @@ engine.currentTurn=g.currentTurn||'red';engine.gameOver=g.gameOver||false;engine
 undoUsed=g.undoUsed||false;
 gameStarted=true;selected=null;validMoves=[];
 D('turnText').textContent=engine.currentTurn==='red'?'红方走棋':'黑方走棋';
-requestAnimationFrame(function(){updateBoardSize();drawBoardBg();render();});
+updateBoardSize();drawBoardBg();render();requestAnimationFrame(function(){updateBoardSize();drawBoardBg();render();});setTimeout(function(){updateBoardSize();drawBoardBg();render();},400);
 if(!engine.gameOver){startTimer();updateTimers();}
 if(engine.currentTurn===aiCl&&!engine.gameOver){
 if(g.gm==='pikafish')pikafishDeepThink();else startAiThink();
