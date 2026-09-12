@@ -48,6 +48,20 @@ td{padding:6px 8px;border-bottom:1px solid #2c1810}
     </table>
   </div>
   <div class="mut" style="margin-top:10px">修改棋力分后段位自动对应；范围 -250 ~ 7000（学1-1 = -160 起）</div>
+  <hr style="border:none;border-top:1px solid #5a3a28;margin:22px 0">
+  <h2 style="font-size:18px">👑 会员管理</h2>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input id="vipCount" type="number" value="5" min="1" max="50" class="num" title="生成数量">
+    <span class="mut">张</span>
+    <input id="vipDays" type="number" value="30" min="1" max="3650" class="num" title="有效天数">
+    <span class="mut">天</span>
+    <button onclick="vipGen()">生成兑换码</button>
+    <button onclick="vipCodes()">兑换码列表</button>
+    <button onclick="vipMembers()">会员列表</button>
+  </div>
+  <div id="vipMsg" class="ok"></div>
+  <div id="vipGenOut" style="margin-top:10px;display:none"></div>
+  <div id="vipOut" style="margin-top:10px"></div>
 </div>
 </div>
 <script>
@@ -154,6 +168,45 @@ function del(i) {
       m.textContent = "✘ " + ((r && r.error) || "删除失败");
     }
   }).catch(function () { document.getElementById("msg").textContent = "网络异常"; });
+}
+function vipGen() {
+  var count = Number(document.getElementById("vipCount").value) || 1;
+  var days = Number(document.getElementById("vipDays").value) || 30;
+  api("/api/admin/vip/generate", { token: TOKEN, count: count, days: days, tier: "vip" }).then(function (r) {
+    var m = document.getElementById("vipMsg");
+    if (r && r.ok) {
+      m.textContent = "✔ 已生成 " + r.codes.length + " 个兑换码（" + days + " 天）";
+      var gout = document.getElementById("vipGenOut");
+      gout.innerHTML = '<div class="mut" style="margin:10px 0 6px">🎉 本次生成的兑换码（点击文本框全选复制，请立即保存）：</div><textarea readonly onclick="this.select()" style="width:100%;height:' + Math.max(70, r.codes.length * 22 + 16) + 'px;background:#2c1810;color:#f5c542;border:1px solid #d4a843;border-radius:6px;padding:8px;font-family:monospace;font-size:14px;font-weight:700">' + esc(r.codes.join("\n")) + '</textarea>';
+      gout.style.display = "";
+    } else {
+      m.textContent = "✘ " + ((r && r.error) || "生成失败");
+    }
+  }).catch(function () { document.getElementById("vipMsg").textContent = "网络异常"; });
+}
+function vipCodes() {
+  api("/api/admin/vip/codes?token=" + encodeURIComponent(TOKEN)).then(function (r) {
+    var out = document.getElementById("vipOut");
+    if (r && r.ok) {
+      var h = '<table><thead><tr><th>兑换码</th><th>天数</th><th>状态</th><th>使用者</th><th>使用时间</th><th>生成时间</th></tr></thead><tbody>';
+      (r.codes || []).forEach(function (c) {
+        h += "<tr><td style='font-family:monospace;color:#d4a843'>" + esc(c.code) + "</td><td>" + c.days + "天</td><td>" + (c.used_by ? "已使用" : "可用") + "</td><td class='mut' style='max-width:200px;word-break:break-all'>" + esc(c.used_by || "-") + "</td><td class='mut'>" + (c.used_at ? new Date(c.used_at).toLocaleString() : "-") + "</td><td class='mut'>" + new Date(c.created_at).toLocaleString() + "</td></tr>";
+      });
+      out.innerHTML = h + "</tbody></table>";
+    } else { out.innerHTML = '<div class="err">加载失败</div>'; }
+  }).catch(function () { document.getElementById("vipMsg").textContent = "网络异常"; });
+}
+function vipMembers() {
+  api("/api/admin/vip/members?token=" + encodeURIComponent(TOKEN)).then(function (r) {
+    var out = document.getElementById("vipOut");
+    if (r && r.ok) {
+      var h = '<table><thead><tr><th>身份ID</th><th>档位</th><th>到期时间</th><th>开通来源</th><th>开通时间</th></tr></thead><tbody>';
+      (r.members || []).forEach(function (mm) {
+        h += "<tr><td class='mut' style='max-width:240px;word-break:break-all'>" + esc(mm.id) + "</td><td>" + esc(mm.tier || "vip") + "</td><td>" + new Date(mm.expires_at).toLocaleString() + "</td><td class='mut' style='max-width:160px;word-break:break-all'>" + esc(mm.source || "-") + "</td><td class='mut'>" + new Date(mm.created_at).toLocaleString() + "</td></tr>";
+      });
+      out.innerHTML = h + "</tbody></table>";
+    } else { out.innerHTML = '<div class="err">加载失败</div>'; }
+  }).catch(function () { document.getElementById("vipMsg").textContent = "网络异常"; });
 }
 if (TOKEN) {
   enter();

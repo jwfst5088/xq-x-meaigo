@@ -1644,6 +1644,106 @@ async function handleApiRequest(request, env) {
       }
     }
   }
+  if (path === "/api/admin/vip/generate" && request.method === "POST" && isAdmin) {
+    try {
+      await env.CHESS_DB.exec("CREATE TABLE IF NOT EXISTS vip_codes (code TEXT PRIMARY KEY, tier TEXT, days INTEGER, used_by TEXT, used_at INTEGER, created_at INTEGER)");
+      const b = await request.json();
+      const count = Math.max(1, Math.min(50, parseInt(b && b.count) || 1));
+      const days = Math.max(1, Math.min(3650, parseInt(b && b.days) || 30));
+      const tier = String((b && b.tier) || "vip").slice(0, 20);
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const codes = [];
+      for (let i = 0; i < count; i++) {
+        const bytes = new Uint8Array(10);
+        crypto.getRandomValues(bytes);
+        let code = "VIP-";
+        for (let j = 0; j < 10; j++) code += alphabet[bytes[j] % alphabet.length];
+        try { await env.CHESS_DB.prepare("INSERT OR IGNORE INTO vip_codes (code, tier, days, created_at) VALUES (?1, ?2, ?3, ?4)").bind(code, tier, days, Date.now()).run(); } catch (e) {}
+        codes.push(code);
+      }
+      return new Response(JSON.stringify({ ok: true, codes }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "generate failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }
+  }
+  if (path === "/api/admin/vip/codes" && isAdmin) {
+    try {
+      const rs = await env.CHESS_DB.prepare("SELECT code, tier, days, used_by, used_at, created_at FROM vip_codes ORDER BY created_at DESC LIMIT 200").all();
+      return new Response(JSON.stringify({ ok: true, codes: rs.rows || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "list failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }
+  }
+  if (path === "/api/admin/vip/members" && isAdmin) {
+    try {
+      const rs = await env.CHESS_DB.prepare("SELECT id, tier, expires_at, created_at, source FROM vip_members ORDER BY expires_at DESC LIMIT 200").all();
+      return new Response(JSON.stringify({ ok: true, members: rs.rows || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "list failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }
+  }
+  if (path.startsWith("/api/vip/")) {
+    if (!env.CHESS_DB) return new Response(JSON.stringify({ error: "no db" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    const db = env.CHESS_DB;
+    try {
+      await db.exec("CREATE TABLE IF NOT EXISTS vip_members (id TEXT PRIMARY KEY, tier TEXT, expires_at INTEGER, created_at INTEGER, source TEXT)");
+      await db.exec("CREATE TABLE IF NOT EXISTS vip_codes (code TEXT PRIMARY KEY, tier TEXT, days INTEGER, used_by TEXT, used_at INTEGER, created_at INTEGER)");
+      await db.exec("CREATE TABLE IF NOT EXISTS vip_usage (id TEXT, day TEXT, count INTEGER, PRIMARY KEY (id, day))");
+    } catch (e) {}
+    const vipNow = Date.now();
+    const vipDay = new Date(vipNow + 28800e3).toISOString().slice(0, 10);
+    const vipQuota = 3;
+    const vipGetMember = async (id) => {
+      try { const r = await db.prepare("SELECT tier, expires_at FROM vip_members WHERE id = ?").bind(id).first(); if (r && r.expires_at > vipNow) return { member: true, tier: r.tier, expiresAt: r.expires_at }; } catch (e) {}
+      return { member: false };
+    };
+    const vipUsedToday = async (id) => {
+      try { const r = await db.prepare("SELECT count FROM vip_usage WHERE id = ? AND day = ?").bind(id, vipDay).first(); return r ? r.count : 0; } catch (e) { return 0; }
+    };
+    if (path === "/api/vip/status" && request.method === "GET") {
+      const id = (url.searchParams.get("id") || "").slice(0, 80);
+      if (!id) return new Response(JSON.stringify({ error: "no id" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+      const m = await vipGetMember(id);
+      const used = m.member ? 0 : await vipUsedToday(id);
+      return new Response(JSON.stringify({ member: m.member, tier: m.tier || null, expiresAt: m.expiresAt || null, used, remaining: m.member ? null : Math.max(0, vipQuota - used), freeQuota: vipQuota }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (path === "/api/vip/redeem" && request.method === "POST") {
+      try {
+        const b = await request.json();
+        const id = String((b && b.id) || "").slice(0, 80);
+        const code = String((b && b.code) || "").trim().toUpperCase();
+        if (!id || !code) return new Response(JSON.stringify({ ok: false, error: "参数缺失" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const cr = await db.prepare("SELECT code, tier, days, used_by FROM vip_codes WHERE code = ?").bind(code).first();
+        if (!cr) return new Response(JSON.stringify({ ok: false, error: "兑换码无效" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (cr.used_by) return new Response(JSON.stringify({ ok: false, error: "兑换码已被使用" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const cur = await db.prepare("SELECT expires_at FROM vip_members WHERE id = ?").bind(id).first();
+        const base = cur && cur.expires_at > vipNow ? cur.expires_at : vipNow;
+        const expiresAt = base + (cr.days || 30) * 86400e3;
+        await db.prepare("INSERT INTO vip_members (id, tier, expires_at, created_at, source) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (id) DO UPDATE SET tier = excluded.tier, expires_at = excluded.expires_at").bind(id, cr.tier || "vip", expiresAt, vipNow, code).run();
+        await db.prepare("UPDATE vip_codes SET used_by = ?1, used_at = ?2 WHERE code = ?3").bind(id, vipNow, code).run();
+        return new Response(JSON.stringify({ ok: true, tier: cr.tier || "vip", expiresAt }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: "兑换失败,请稍后再试" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+      }
+    }
+    if (path === "/api/vip/consume" && request.method === "POST") {
+      try {
+        const b = await request.json();
+        const id = String((b && b.id) || "").slice(0, 80);
+        if (!id) return new Response(JSON.stringify({ ok: false, error: "no id" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        const m = await vipGetMember(id);
+        if (m.member) return new Response(JSON.stringify({ ok: true, member: true, remaining: null }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const used = await vipUsedToday(id);
+        if (used >= vipQuota) return new Response(JSON.stringify({ ok: false, error: "quota", used, remaining: 0, freeQuota: vipQuota }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const nUsed = used + 1;
+        await db.prepare("INSERT INTO vip_usage (id, day, count) VALUES (?1, ?2, ?3) ON CONFLICT (id, day) DO UPDATE SET count = vip_usage.count + 1").bind(id, vipDay, nUsed).run();
+        return new Response(JSON.stringify({ ok: true, member: false, used: nUsed, remaining: vipQuota - nUsed, freeQuota: vipQuota }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: "consume failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+      }
+    }
+    return new Response(JSON.stringify({ error: "Not found" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
+  }
   if (path === "/api/rooms") {
     return new Response(JSON.stringify({ rooms: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
