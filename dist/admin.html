@@ -21,6 +21,8 @@ td{padding:6px 8px;border-bottom:1px solid #2c1810}
 .mut{color:#8b7355;font-size:12px}
 .save{padding:3px 10px;font-size:12px}
 .wrap{max-width:1080px;margin:0 auto}
+.egPiece{position:absolute;width:29px;height:29px;border-radius:50%;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 -1px 2px rgba(255,255,255,.42),0 3px 5px rgba(55,30,10,.42);background:radial-gradient(circle at 35% 25%,#f5e4c0 0%,#d4a860 45%,#906030 100%);color:#8b0000;border:2px solid #8b4513;box-sizing:border-box;line-height:1;pointer-events:none;z-index:2}
+.egPiece.egB{color:#1a1a2e;border-color:#4a4a4a}
 </style>
 </head>
 <body>
@@ -59,9 +61,38 @@ td{padding:6px 8px;border-bottom:1px solid #2c1810}
     <button onclick="vipCodes()">兑换码列表</button>
     <button onclick="vipMembers()">会员列表</button>
   </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+    <button style="width:auto;flex-shrink:0" onclick="document.getElementById('vipDays').value=30">月卡 30 天</button>
+    <button style="width:auto;flex-shrink:0" onclick="document.getElementById('vipDays').value=90">季卡 90 天</button>
+    <button style="width:auto;flex-shrink:0" onclick="document.getElementById('vipDays').value=180">半年 180 天</button>
+    <button style="width:auto;flex-shrink:0" onclick="document.getElementById('vipDays').value=365">年卡 365 天</button>
+  </div>
   <div id="vipMsg" class="ok"></div>
   <div id="vipGenOut" style="margin-top:10px;display:none"></div>
   <div id="vipOut" style="margin-top:10px"></div>
+  <hr style="border:none;border-top:1px solid #5a3a28;margin:22px 0">
+  <h2 style="font-size:18px">🎯 残局管理</h2>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button onclick="egList()">刷新残局列表</button>
+    <button onclick="egResetForm()">新建残局</button>
+  </div>
+  <div id="egMsg" class="ok"></div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">
+    <div style="flex:1;min-width:280px">
+      <div style="margin-bottom:6px"><b>残局列表</b></div>
+      <div id="egOut" style="max-height:420px;overflow:auto"></div>
+    </div>
+    <div style="flex:1;min-width:320px">
+      <div style="margin-bottom:6px"><b id="egFormTitle">新建残局</b></div>
+      <div style="margin-bottom:6px"><input id="egName" placeholder="残局名称（如：马炮争雄）" style="width:100%;padding:7px;background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px" maxlength="30"></div>
+      <div style="margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">难度 <select id="egDiff" style="background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;padding:5px"><option value="1">★</option><option value="2">★★</option><option value="3">★★★</option><option value="4">★★★★</option><option value="5">★★★★★</option></select> 玩家执 <select id="egSide" style="background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;padding:5px"><option value="red">红方</option><option value="black">黑方</option></select></div>
+      <div style="margin-bottom:6px"><input id="egGoal" placeholder="目标说明（如：三步内将死黑方）" style="width:100%;padding:7px;background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px" maxlength="60"></div>
+      <div style="margin-bottom:6px" class="mut">摆局：先点下方棋子按钮选中，再点棋盘格放置；点击已有棋子的格子可清除。</div>
+      <div id="egPick" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px"></div>
+      <div id="egBoard" style="position:relative;width:296px;height:330px;margin-bottom:6px;box-shadow:0 3px 14px rgba(0,0,0,.55);border-radius:4px;overflow:hidden"><canvas id="egBg" width="296" height="330" style="position:absolute;left:0;top:0"></canvas><div id="egPieces" style="position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none"></div></div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="egSave()" style="background:#3f6f3f">💾 保存残局</button> <button onclick="egResetForm()">清空重摆</button> <span id="egCount" class="mut" style="align-self:center"></span></div>
+    </div>
+  </div>
 </div>
 </div>
 <script>
@@ -184,13 +215,27 @@ function vipGen() {
     }
   }).catch(function () { document.getElementById("vipMsg").textContent = "网络异常"; });
 }
+function daysLabel(d) { d = Number(d) || 0; var m = { 30: "(月卡)", 90: "(季卡)", 180: "(半年)", 365: "(年卡)" }; return d + "天" + (m[d] || ""); }
+function ckAll(box, cls) { var els = document.querySelectorAll("." + cls); for (var i = 0; i < els.length; i++) els[i].checked = box.checked; }
+function vipBatchDel(type) {
+  var cls = type === 'members' ? 'ckMember' : 'ckCode';
+  var els = document.querySelectorAll('.' + cls + ':checked');
+  if (!els.length) { document.getElementById('vipMsg').textContent = '请先勾选要删除的项'; return; }
+  if (!confirm('确定删除选中的 ' + els.length + ' 项？此操作不可恢复')) return;
+  var ids = []; for (var i = 0; i < els.length; i++) ids.push(els[i].value);
+  api('/api/admin/vip/batch_delete', { token: TOKEN, type: type, ids: ids }).then(function (r) {
+    var m = document.getElementById('vipMsg');
+    if (r && r.ok) { m.textContent = '✔ 已删除 ' + r.deleted + ' 项'; if (type === 'members') vipMembers(); else vipCodes(); }
+    else { m.textContent = '✘ ' + ((r && r.error) || '删除失败'); }
+  }).catch(function () { document.getElementById('vipMsg').textContent = '网络异常'; });
+}
 function vipCodes() {
   api("/api/admin/vip/codes?token=" + encodeURIComponent(TOKEN)).then(function (r) {
     var out = document.getElementById("vipOut");
     if (r && r.ok) {
-      var h = '<table><thead><tr><th>兑换码</th><th>天数</th><th>状态</th><th>使用者</th><th>使用时间</th><th>生成时间</th></tr></thead><tbody>';
+      var h = '<div style="margin-bottom:6px"><button style="width:auto;background:#8b2f2f;color:#fff" onclick="vipBatchDel(\'codes\')">🗑 删除选中兑换码</button></div><table><thead><tr><th>选</th><th>兑换码</th><th>天数</th><th>状态</th><th>使用者</th><th>使用时间</th><th>生成时间</th></tr></thead><tbody>';
       (r.codes || []).forEach(function (c) {
-        h += "<tr><td style='font-family:monospace;color:#d4a843'>" + esc(c.code) + "</td><td>" + c.days + "天</td><td>" + (c.used_by ? "已使用" : "可用") + "</td><td class='mut' style='max-width:200px;word-break:break-all'>" + esc(c.used_by || "-") + "</td><td class='mut'>" + (c.used_at ? new Date(c.used_at).toLocaleString() : "-") + "</td><td class='mut'>" + new Date(c.created_at).toLocaleString() + "</td></tr>";
+        h += "<tr><td><input type='checkbox' class='ckCode' value='" + esc(c.code) + "'></td><td style='font-family:monospace;color:#d4a843'>" + esc(c.code) + "</td><td>" + daysLabel(c.days) + "</td><td>" + (c.used_by ? "已使用" : "可用") + "</td><td class='mut' style='max-width:200px;word-break:break-all'>" + esc(c.used_by || "-") + "</td><td class='mut'>" + (c.used_at ? new Date(c.used_at).toLocaleString() : "-") + "</td><td class='mut'>" + new Date(c.created_at).toLocaleString() + "</td></tr>";
       });
       out.innerHTML = h + "</tbody></table>";
     } else { out.innerHTML = '<div class="err">加载失败</div>'; }
@@ -200,14 +245,154 @@ function vipMembers() {
   api("/api/admin/vip/members?token=" + encodeURIComponent(TOKEN)).then(function (r) {
     var out = document.getElementById("vipOut");
     if (r && r.ok) {
-      var h = '<table><thead><tr><th>身份ID</th><th>档位</th><th>到期时间</th><th>开通来源</th><th>开通时间</th></tr></thead><tbody>';
+      var h = '<div style="margin-bottom:6px"><button style="width:auto;background:#8b2f2f;color:#fff" onclick="vipBatchDel(\'members\')">🗑 删除选中会员</button></div><table><thead><tr><th>选</th><th>身份ID</th><th>档位</th><th>到期时间</th><th>开通来源</th><th>开通时间</th></tr></thead><tbody>';
       (r.members || []).forEach(function (mm) {
-        h += "<tr><td class='mut' style='max-width:240px;word-break:break-all'>" + esc(mm.id) + "</td><td>" + esc(mm.tier || "vip") + "</td><td>" + new Date(mm.expires_at).toLocaleString() + "</td><td class='mut' style='max-width:160px;word-break:break-all'>" + esc(mm.source || "-") + "</td><td class='mut'>" + new Date(mm.created_at).toLocaleString() + "</td></tr>";
+        h += "<tr><td><input type='checkbox' class='ckMember' value='" + esc(mm.id) + "'></td><td class='mut' style='max-width:240px;word-break:break-all'>" + esc(mm.id) + "</td><td>" + esc(mm.tier || "vip") + "</td><td>" + new Date(mm.expires_at).toLocaleString() + "</td><td class='mut' style='max-width:160px;word-break:break-all'>" + esc(mm.source || "-") + "</td><td class='mut'>" + new Date(mm.created_at).toLocaleString() + "</td></tr>";
       });
       out.innerHTML = h + "</tbody></table>";
     } else { out.innerHTML = '<div class="err">加载失败</div>'; }
   }).catch(function () { document.getElementById("vipMsg").textContent = "网络异常"; });
 }
+var EG_TYPES = [["rook","车"],["horse","马"],["elephant","相"],["advisor","仕"],["king","帅"],["cannon","炮"],["pawn","兵"]];
+var EG_TB = [["rook","车"],["horse","马"],["elephant","象"],["advisor","士"],["king","将"],["cannon","炮"],["pawn","卒"]];
+var EG_CHARS = { red: { rook: "车", horse: "马", elephant: "相", advisor: "仕", king: "帅", cannon: "炮", pawn: "兵" }, black: { rook: "车", horse: "马", elephant: "象", advisor: "士", king: "将", cannon: "炮", pawn: "卒" } };
+var egPieces = [];
+var egPick = null; // {type,color}
+function egMsg(t) { document.getElementById("egMsg").textContent = t; }
+function egBuildPicker() {
+  var pk = document.getElementById("egPick");
+  var h = "<span class='mut' style='align-self:center'>红：</span>";
+  EG_TYPES.forEach(function (t) { h += "<button style='width:auto;color:#ffd9a0;' onclick='egPickType(\"" + t[0] + "\",\"red\")'>" + t[1] + "</button>"; });
+  h += "<span class='mut' style='align-self:center;margin-left:8px'>黑：</span>";
+  EG_TB.forEach(function (t) { h += "<button style='width:auto;color:#9cc0ff' onclick='egPickType(\"" + t[0] + "\",\"black\")'>" + t[1] + "</button>"; });
+  pk.innerHTML = h;
+}
+function egPickType(type, color) { egPick = { type: type, color: color }; egMsg("已选中" + (color === "red" ? "红" : "黑") + EG_CHARS[color][type] + "，点击棋盘放置"); }
+var EG_PS = 12, EG_RCS = 34, EG_W = 296, EG_H = 330;
+function egDrawBg() {
+  var cv = document.getElementById("egBg");
+  var ctx = cv.getContext("2d");
+  var ps = EG_PS, bw = EG_W - ps * 2, bh = EG_H - ps * 2;
+  var wood = ctx.createLinearGradient(0, ps, 0, ps + bh);
+  wood.addColorStop(0, "#c28e56"); wood.addColorStop(0.5, "#e8c99a"); wood.addColorStop(1, "#e0b383");
+  ctx.fillStyle = "#d4a56a"; ctx.fillRect(ps - 4, ps - 4, bw + 8, bh + 8);
+  ctx.fillStyle = wood; ctx.fillRect(ps, ps, bw, bh);
+  ctx.strokeStyle = "#9c7550"; ctx.lineWidth = 1.2;
+  for (var r = 0; r < 10; r++) { var y = ps + r * (bh / 9); ctx.beginPath(); ctx.moveTo(ps, y); ctx.lineTo(ps + bw, y); ctx.stroke(); }
+  for (var c = 0; c < 9; c++) {
+    var x = ps + c * (bw / 8);
+    if (c === 0 || c === 8) { ctx.beginPath(); ctx.moveTo(x, ps); ctx.lineTo(x, ps + bh); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(x, ps); ctx.lineTo(x, ps + 4 * (bh / 9)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, ps + 5 * (bh / 9)); ctx.lineTo(x, ps + bh); ctx.stroke(); }
+  }
+  ctx.beginPath(); ctx.moveTo(ps + bw * 3 / 8, ps); ctx.lineTo(ps + bw * 5 / 8, ps + bh * 2 / 9); ctx.moveTo(ps + bw * 5 / 8, ps); ctx.lineTo(ps + bw * 3 / 8, ps + bh * 2 / 9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ps + bw * 3 / 8, ps + bh * 7 / 9); ctx.lineTo(ps + bw * 5 / 8, ps + bh); ctx.moveTo(ps + bw * 5 / 8, ps + bh * 7 / 9); ctx.lineTo(ps + bw * 3 / 8, ps + bh); ctx.stroke();
+  var _stL = 5.4, _d = 2.7;
+  var _star = [[2,1],[2,7],[7,1],[7,7],[3,0],[3,2],[3,4],[3,6],[3,8],[6,0],[6,2],[6,4],[6,6],[6,8]];
+  ctx.strokeStyle = "#a07840"; ctx.lineWidth = 0.8;
+  for (var si = 0; si < _star.length; si++) {
+    var sy = ps + _star[si][0] * (bh / 9), sx = ps + _star[si][1] * (bw / 8);
+    var skipL = _star[si][1] === 0, skipR = _star[si][1] === 8;
+    if (!skipL) { ctx.beginPath(); ctx.moveTo(sx - _d - _stL, sy - _d); ctx.lineTo(sx - _d, sy - _d); ctx.lineTo(sx - _d, sy - _d - _stL); ctx.stroke(); ctx.beginPath(); ctx.moveTo(sx - _d - _stL, sy + _d); ctx.lineTo(sx - _d, sy + _d); ctx.lineTo(sx - _d, sy + _d + _stL); ctx.stroke(); }
+    if (!skipR) { ctx.beginPath(); ctx.moveTo(sx + _d + _stL, sy - _d); ctx.lineTo(sx + _d, sy - _d); ctx.lineTo(sx + _d, sy - _d - _stL); ctx.stroke(); ctx.beginPath(); ctx.moveTo(sx + _d + _stL, sy + _d); ctx.lineTo(sx + _d, sy + _d); ctx.lineTo(sx + _d, sy + _d + _stL); ctx.stroke(); }
+  }
+  ctx.fillStyle = "rgba(90,58,40,.85)"; ctx.font = "700 13px serif"; ctx.textAlign = "center";
+  ctx.fillText("楚  河", ps + bw * 0.28, ps + bh * 0.52);
+  ctx.fillText("汉  界", ps + bw * 0.72, ps + bh * 0.52);
+}
+function egBuildBoard() {
+  egDrawBg();
+  var pv = document.getElementById("egPieces");
+  var h = "";
+  for (var r = 0; r < 10; r++) for (var c = 0; c < 9; c++) {
+    var pc = egFind(r, c);
+    var ch = pc ? EG_CHARS[pc.color][pc.type] : "";
+    if (pc) h += '<div class="egPiece' + (pc.color === "black" ? " egB" : "") + '" style="left:' + (EG_PS + c * EG_RCS) + 'px;top:' + (EG_PS + r * EG_RCS) + 'px;margin:-15px 0 0 -15px">'+ ch + '</div>';
+  }
+  pv.innerHTML = h;
+  var bd = document.getElementById("egBoard");
+  var o = "";
+  for (var r2 = 0; r2 < 10; r2++) for (var c2 = 0; c2 < 9; c2++) {
+    o += '<div onclick="egCell(' + r2 + ',' + c2 + ')" style="position:absolute;left:' + (EG_PS + c2 * EG_RCS - 17) + 'px;top:' + (EG_PS + r2 * EG_RCS - 17) + 'px;width:34px;height:34px;cursor:pointer;z-index:3"></div>';
+  }
+  var old = document.getElementById("egHits");
+  if (old) old.remove();
+  var hits = document.createElement("div");
+  hits.id = "egHits"; hits.style.cssText = "position:absolute;inset:0;z-index:3";
+  hits.innerHTML = o;
+  bd.appendChild(hits);
+  document.getElementById("egCount").textContent = "共 " + egPieces.length + " 子（双方各需一将）";
+}
+function egFind(r, c) { for (var i = 0; i < egPieces.length; i++) { var p = egPieces[i]; if (p.row === r && p.col === c) return p; } return null; }
+function egCell(r, c) {
+  var ex = egFind(r, c);
+  if (ex) { egPieces.splice(egPieces.indexOf(ex), 1); egBuildBoard(); return; }
+  if (!egPick) { egMsg("请先在上方选择要放置的棋子"); return; }
+  if (egPieces.length >= 32) { egMsg("最多 32 子"); return; }
+  egPieces.push({ type: egPick.type, color: egPick.color, row: r, col: c });
+  egBuildBoard();
+}
+function egResetForm() {
+  egPieces = []; egPick = null;
+  document.getElementById("egName").value = "";
+  document.getElementById("egGoal").value = "";
+  document.getElementById("egDiff").value = "1";
+  document.getElementById("egSide").value = "red";
+  document.getElementById("egFormTitle").textContent = "新建残局";
+  delete document.getElementById("egFormTitle").dataset.id;
+  egBuildBoard(); egMsg("");
+}
+function egSave() {
+  var name = document.getElementById("egName").value.trim();
+  if (!name) { egMsg("请输入残局名称"); return; }
+  var ks = egPieces.filter(function (p) { return p.type === "king"; });
+  if (ks.filter(function (p) { return p.color === 'red'; }).length !== 1 || ks.filter(function (p) { return p.color === 'black'; }).length !== 1) { egMsg('双方必须各有一将/帅'); return; }
+  var body = { token: TOKEN, id: document.getElementById("egFormTitle").dataset.id || null, name: name, difficulty: Number(document.getElementById("egDiff").value) || 1, side: document.getElementById("egSide").value, goal: document.getElementById("egGoal").value.trim(), pieces: egPieces, enabled: 1 };
+  api('/api/admin/endgame/save', body).then(function (r) {
+    if (r && r.ok) { egMsg('✔ 已保存（ID ' + r.id + '）'); egList(); egResetForm(); }
+    else egMsg('✘ ' + ((r && r.error) || '保存失败'));
+  }).catch(function () { egMsg('网络异常'); });
+}
+function egList() {
+  api('/api/admin/endgame/list?token=' + encodeURIComponent(TOKEN)).then(function (r) {
+    var out = document.getElementById("egOut");
+    if (r && r.ok) {
+      var h = '<table><thead><tr><th>ID</th><th>名称</th><th>难度</th><th>执方</th><th>子数</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      (r.list || []).forEach(function (p) {
+      h += "<tr><td>" + p.id + "</td><td>" + esc(p.name) + "</td><td>" + "★".repeat(p.difficulty || 1) + "</td><td>" + (p.side === 'red' ? '红' : '黑') + "</td><td>" + p.count + "</td><td>" + (p.enabled ? '上架' : '下架') + "</td><td>" + "<button style='width:auto;padding:3px 8px;font-size:12px' onclick='egToggle(" + p.id + ")'>" + (p.enabled ? '下架' : '上架') + "</button> <button style='width:auto;padding:3px 8px;font-size:12px' onclick='egEdit(" + p.id + ")'>编辑</button> <button style='width:auto;padding:3px 8px;font-size:12px;background:#8b2f2f;color:#fff' onclick='egDel(" + p.id + ")'>删</button></td></tr>";
+      });
+      out.innerHTML = h + "</tbody></table>";
+    } else { out.innerHTML = '<div class="err">加载失败</div>'; }
+  }).catch(function () { egMsg('网络异常'); });
+}
+function egToggle(id) {
+  api('/api/admin/endgame/op', { token: TOKEN, id: id, op: 'toggle' }).then(function (r) { if (r && r.ok) egList(); else egMsg('操作失败'); }).catch(function () { egMsg('网络异常'); });
+}
+function egDel(id) {
+  if (!confirm('确定删除残局 #' + id + '？')) return;
+  api('/api/admin/endgame/op', { token: TOKEN, id: id, op: 'delete' }).then(function (r) { if (r && r.ok) { egMsg('✔ 已删除'); egList(); } else egMsg('删除失败'); }).catch(function () { egMsg('网络异常'); });
+}
+function egEdit(id) {
+  api('/api/admin/endgame/list?token=' + encodeURIComponent(TOKEN)).then(function (r) {
+    if (!(r && r.ok)) { egMsg("加载失败"); return; }
+    var p = (r.list || []).filter(function (x) { return x.id === id; })[0];
+    if (!p) { egMsg("未找到该残局"); return; }
+    egPieces = JSON.parse(JSON.stringify(p.pieces || []));
+    document.getElementById("egName").value = p.name;
+    document.getElementById("egGoal").value = p.goal || "";
+    document.getElementById("egDiff").value = String(p.difficulty || 1);
+    document.getElementById("egSide").value = p.side || "red";
+    var ft = document.getElementById("egFormTitle");
+    ft.textContent = "编辑残局 #" + p.id;
+    ft.dataset.id = p.id;
+    egBuildBoard();
+    egMsg("编辑中：修改后点保存");
+  }).catch(function () { egMsg("网络异常"); });
+}
+egBuildPicker();
+egBuildBoard();
+egList();
+
+
 if (TOKEN) {
   enter();
 }

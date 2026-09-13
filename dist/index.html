@@ -213,6 +213,7 @@ html,body{height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei
 <div class="mode-cards">
 <div class="mode-card" id="aiEasyCard" style="display:none" onclick="startAiGame()"><div class="mc-icon">🤖</div><div class="mc-name">人机对弈初级</div><div class="mc-desc">入门练习 · 不计分</div></div>
 <div class="mode-card" onclick="startPikafishGame()"><div class="mc-icon">🧠</div><div class="mc-name">人机对弈高级</div><div class="mc-desc">专业引擎 · 高强度</div></div>
+<div class="mode-card" onclick="openEndgamePanel()"><div class="mc-icon">🎯</div><div class="mc-name">残局挑战</div><div class="mc-desc">经典残局 · 闯关练习</div></div>
 <div class="mode-card" id="trainCard" style="display:none" onclick="toggleTrainPanel()"><div class="mc-icon">⚙️</div><div class="mc-name">AI快速训练</div><div class="mc-desc" id="trainStats">累计训练：0局</div></div>
 </div>
 <div id="trainPanel" style="display:none;background:#1a0f0a;border-radius:10px;padding:10px 14px;border:1px solid #3d2117;text-align:left;width:100%;max-width:520px;box-sizing:border-box">
@@ -1195,6 +1196,7 @@ sndStart();
 
 function startAiGame(userColor){
 if(aiThinking)return;
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;
 userColor=userColor||(Math.random()<0.5?'red':'black');
 soundEnabled=true;gameOverSoundPlayed=false;undoUsed=false;aiThinking=false;
 gm='ai';myCl=userColor;myRm=null;boardFlip=(userColor==='black');
@@ -1215,6 +1217,7 @@ if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 function retryAiGame(){
 hideOverlay();
 stopAi();
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;
 soundEnabled=true;gameOverSoundPlayed=false;undoUsed=false;aiThinking=false;
 // 变更日志：重试时也随机分配红黑方（原硬编码用户执红）
 gm='ai';
@@ -1232,6 +1235,65 @@ saveGameState();
 if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 }
 
+window._endgameActive=null;window._endgamePz=null;
+function startEndgameGame(pz){
+if(aiThinking)return;
+window._endgamePz=pz;window._endgameActive={id:pz.id,name:pz.name};
+soundEnabled=true;gameOverSoundPlayed=false;undoUsed=false;aiThinking=false;
+gm='ai';myCl=pz.side;myRm=null;boardFlip=(pz.side==='black');
+aiCl=(pz.side==='red')?'black':'red';
+D('drawBtn').style.display='none';
+D('redName').textContent=(myCl==='red')?_xqMyName()+'（红方）':'AI（红方）';
+D('blackName').textContent=(myCl==='black')?_xqMyName()+'（黑方）':'AI（黑方）';
+D('modeBadge').textContent='残局挑战';
+engine.board=[];for(var _r=0;_r<10;_r++){engine.board[_r]=[];for(var _c=0;_c<9;_c++)engine.board[_r][_c]=null;}
+var _ok=true;
+for(var _i=0;_i<pz.pieces.length;_i++){var p=pz.pieces[_i];if(engine.board[p.row]&&engine.board[p.row][p.col]===undefined){_ok=false;break;}if(!engine.board[p.row]){engine.board[p.row]=[];}engine.board[p.row][p.col]={type:p.type,color:p.color};}
+window._endgameStartBoard=null;try{window._endgameStartBoard=engine.board.map(function(row){return row.map(function(p){return p?{type:p.type,color:p.color}:null;});});window._endgameStartTurn="red";}catch(eSb){}
+engine.currentTurn='red';engine.gameOver=false;engine.winner=null;engine.moveHistory=[];
+capRed=[];capBlk=[];lastMove=null;selected=null;validMoves=[];gameStarted=true;clickCount=0;checkStreak=0;lastCheckColor=null;
+enterGameUI();
+saveGameState();
+D('turnText').textContent='红方走棋';
+drawBoardBg();render();
+startTimer();sndStart();
+try{toast('残局挑战「'+pz.name+'」，将死对方即通关！',3200);}catch(e0){}
+if(aiCl==='red'&&!engine.gameOver){pikafishDeepThink();}
+}
+function retryEndgame(){
+hideOverlay();stopAi();
+if(window._endgamePz){startEndgameGame(window._endgamePz);}else{window._endgameActive=null;retryAiGame();}
+}
+function openEndgamePanel(){
+var pn=document.getElementById("egPanel");if(pn)pn.style.display="flex";
+renderEgList();
+}
+function closeEndgamePanel(){var pn=document.getElementById("egPanel");if(pn)pn.style.display="none";}
+function renderEgList(){
+var box=document.getElementById("egList");if(!box)return;
+try{
+fetch("/api/endgame/list",{headers:{"Content-Type":"application/json"}}).then(function(r){return r.json();}).then(function(r){
+if(!(r&&r.ok&&r.list&&r.list.length)){box.innerHTML=(r&&r.ok)?"暂无残局，敬请期待":"加载失败，请稍后再试";return;}
+var out="";
+for(var i=0;i<r.list.length;i++){var p=r.list[i];
+var stars="";for(var s=0;s<(p.difficulty||1);s++)stars+="★";
+var safe=String(p.name||"").replace(/</g,"&lt;");
+var goal=String(p.goal||"").replace(/</g,"&lt;");
+out+="<div onclick=\"startEndgameFromList(" + p.id + ")\" style=\"background:#3a2417;border:1px solid #5a3a28;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer\">" +
+"<div style=\"display:flex;justify-content:space-between;align-items:center\"><b style=\"color:#f0d9b5\">" + safe + "</b><span style=\"color:#e8b339\">" + stars + "</span></div>" +
+"<div style=\"font-size:12px;color:#c9a87c;margin-top:3px\">执" + (p.side === "red" ? "红" : "黑") + (goal ? " · " + goal : "") + "</div></div>";
+window._egCache=r.list;}
+box.innerHTML=out;
+}).catch(function(){box.innerHTML="加载失败，请稍后再试";});
+}catch(e){box.innerHTML="加载失败";}
+}
+function startEndgameFromList(id){
+var p=(window._egCache||[]).filter(function(x){return x.id===id;})[0];
+if(!p)return;
+closeEndgamePanel();
+startEndgameGame(p);
+}
+window.startEndgameFromList=startEndgameFromList;window.openEndgamePanel=openEndgamePanel;window.closeEndgamePanel=closeEndgamePanel;window.retryEndgame=retryEndgame;
 function doMove(fr,fc,tr,tc){
 if(window._xqSpectator)return;
 var rs=engine.move(fr,fc,tr,tc);
@@ -1299,12 +1361,25 @@ if(rs.check){
 }
 
 if((gm==='ai'||gm==='pikafish')&&!engine.gameOver&&engine.currentTurn===aiCl){
-if(gm==='ai')startAiThink();
+if(gm==='ai'){if(window._endgameActive)pikafishDeepThink();else startAiThink();}
 else if(gm==='pikafish')pikafishDeepThink();
 }
 }
 
 function showGameOver(wt){
+if(gm==='ai'&&window._endgameActive){
+var _eg=window._endgameActive;
+var _egn=String(_eg.name||"").replace(/</g,"&lt;");
+if(engine.winner===myCl){
+try{fetch("/api/endgame/clear",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:_eg.id,deviceId:(window.vipId?vipId():""),moves:engine.moveHistory.length})});}catch(eE0){}
+showOverlay('<h2>🏆 残局通关!</h2><p>'+"「"+_egn+"」 · 共"+engine.moveHistory.length+"步"+'</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryEndgame()">再挑战</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
+}else if(engine.winner===aiCl){
+showOverlay('<h2>💪 挑战失败</h2><p>'+"「"+_egn+"」 · AI防守成功，再试试"+'</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryEndgame()">再挑战</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
+}else{
+showOverlay('<h2>🤝 和棋</h2><p>'+"「"+_egn+"」 · 不分胜负"+'</p><div class="btns2"><button class="btn btn-green" style="width:auto;padding:10px 20px;font-size:14px" onclick="retryEndgame()">再挑战</button><button class="btn btn-outline" style="width:auto;padding:10px 20px;font-size:14px" onclick="leaveGame()">返回</button></div>');
+}
+return;
+}
 if(gm==='ai'){
 if(engine.winner===aiCl)recordGameResult('aiWin');
 else if(engine.winner===myCl)recordGameResult('aiLose');
@@ -1555,6 +1630,9 @@ D('turnText').textContent='等待对手加入...';
 socket.on('redirect_room',function(d){
 window._pendingRoomAction=d;
 socket.reconnectToRoom(d.roomId);
+});
+socket.on('vip_only_create',function(d){
+window.showVipGateDialog((d&&d.msg)||'只有会员才能创建房间，可使用快速匹配。');
 });
 socket.on('room_joined',function(d){
 try{localStorage.removeItem('xq_game');}catch(e){}
@@ -6636,13 +6714,24 @@ window.addEventListener('beforeunload',function(){if(_matching)cancelMatch();});
 
 // ---------- 带身份的创建/加入 ----------
 if(typeof createRoom==='function'){
+window.showVipGateDialog=function(msg){try{var old=document.getElementById('vipGateMask');if(old)old.remove();var mask=document.createElement('div');mask.id='vipGateMask';mask.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center';var card=document.createElement('div');card.style.cssText='background:linear-gradient(160deg,#2a1a10,#1a0f08);border:1px solid #d4a843;border-radius:14px;padding:22px 26px;max-width:320px;width:82%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.6)';card.innerHTML='<div style="font-size:34px;line-height:1.2;margin-bottom:8px">👑</div><div style="color:#d4a843;font-weight:800;font-size:16px;margin-bottom:10px">会员专属功能</div><div style="color:#e8d5b5;font-size:14px;line-height:1.7;margin-bottom:18px">'+(msg||'只有会员才能创建房间，可使用快速匹配。')+'</div>';var btn=document.createElement('button');btn.textContent='我知道了';btn.style.cssText='background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:8px;padding:10px 34px;font-size:15px;font-weight:800;cursor:pointer';btn.onclick=function(){mask.remove();};card.appendChild(btn);mask.appendChild(card);mask.onclick=function(e){if(e.target===mask)mask.remove();};document.body.appendChild(mask);}catch(e){try{toast(msg||'只有会员才能创建房间',3000);}catch(e0){}}};
 window.createRoom=function(){
 if(typeof sockOk==='undefined'||!sockOk){var s=$id('lobbyStatus');if(s)s.textContent='服务器未连接，请稍候再试';return;}
+var _goCreate=function(){
 var ci=$id('createInput');
 var customId=ci?ci.value.trim().toUpperCase():'';
 var lastColor=null;try{lastColor=localStorage.getItem('xq_last_color');}catch(e){}
 var s2=$id('lobbyStatus');if(s2)s2.textContent='正在创建房间...';
-socket.emit('create_room',Object.assign({roomId:customId||null,lastColor:lastColor},window._xqIdentityFields()));
+socket.emit('create_room',Object.assign({roomId:customId||null,lastColor:lastColor,vipId:vipId()},window._xqIdentityFields()));
+};
+var _vnow=Date.now();var _vc=window._xqVip;
+if(_vc&&_vc.member&&(!_vc.expiresAt||_vc.expiresAt>_vnow)){_goCreate();return;}
+try{
+vipApi('/api/vip/status?id='+encodeURIComponent(vipId())).then(function(_st){
+if(_st&&_st.member&&(!_st.expiresAt||_st.expiresAt>_vnow)){window._xqVip=_st;_goCreate();}
+else{window.showVipGateDialog('只有会员才能创建房间，可使用快速匹配。');}
+}).catch(function(){window.showVipGateDialog('只有会员才能创建房间，可使用快速匹配。');});
+}catch(e){try{toast('只有会员才能创建房间',2500);}catch(e0){}}
 };
 window.joinRoom=function(){
 if(typeof sockOk==='undefined'||!sockOk){var s=$id('lobbyStatus');if(s)s.textContent='服务器未连接，请稍候再试';return;}
@@ -6682,7 +6771,7 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 }catch(e){}
 };
 }
-window.openLiveReview=function(){try{var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];if(mv&&mv.length){openReview({moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine&&engine.gameOver)?engine.winner:null,gm:(typeof gm!=='undefined')?gm:'online'});return;}var self=arguments;var proceed=function(){try{var list=window._rvMerged?window._rvMerged():[];if(!list.length){toast('还没有可复盘的对局');return;}window._rvMIdx=list.length-1;var it=list[list.length-1];if(it.srv){var meta=it.srv;var _idf=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/get?id='+meta.id+'&deviceId='+encodeURIComponent(_idf.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.game&&d.game.moves&&d.game.moves.length){openReview({moves:d.game.moves,myCl:d.game.myCl,winner:d.game.winner,gm:d.game.gm});}else{toast('棋谱加载失败');}}).catch(function(){toast('棋谱加载失败');});}else{var g=it.loc;if(g&&g.moves&&g.moves.length){openReview({moves:g.moves,myCl:g.myCl,winner:g.winner,gm:g.gm});}}}catch(eP){toast('复盘打开失败');}};if(window._histSrv&&window._histSrv.length){proceed();return;}var _idf2=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf2.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;}proceed();}).catch(function(){proceed();});}catch(e){}};
+window.openLiveReview=function(){try{var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];if(mv&&mv.length){var _snap={moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine&&engine.gameOver)?engine.winner:null,gm:(typeof gm!=='undefined')?gm:'online'};if(window._endgameActive&&window._endgameStartBoard){_snap.startBoard=window._endgameStartBoard;_snap.startTurn=window._endgameStartTurn||'red';}openReview(_snap);return;}var self=arguments;var proceed=function(){try{var list=window._rvMerged?window._rvMerged():[];if(!list.length){toast('还没有可复盘的对局');return;}window._rvMIdx=list.length-1;var it=list[list.length-1];if(it.srv){var meta=it.srv;var _idf=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/get?id='+meta.id+'&deviceId='+encodeURIComponent(_idf.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.game&&d.game.moves&&d.game.moves.length){openReview({moves:d.game.moves,myCl:d.game.myCl,winner:d.game.winner,gm:d.game.gm});}else{toast('棋谱加载失败');}}).catch(function(){toast('棋谱加载失败');});}else{var g=it.loc;if(g&&g.moves&&g.moves.length){openReview({moves:g.moves,myCl:g.myCl,winner:g.winner,gm:g.gm});}}}catch(eP){toast('复盘打开失败');}};if(window._histSrv&&window._histSrv.length){proceed();return;}var _idf2=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf2.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;}proceed();}).catch(function(){proceed();});}catch(e){}};
 window.openReview=function(snapIn){
 var snap=snapIn||window._reviewSnapshot;
 if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
@@ -6698,7 +6787,7 @@ pnl.innerHTML='<div class="rv-head" style="display:none"><span style="color:#d4a
 +'<div id="rvDetail" style="display:none;font-size:12px;color:#c4a882;margin:6px 0;min-height:18px">分析中…</div>'
 +'<div id="rvBoardWrap" style="position:relative;margin:6px auto 8px;width:100%"><canvas id="rvBg" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="rvBoard" style="position:absolute;left:0;top:0;width:100%;height:100%"></div></div>'+'<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(-1)">⬅ 上一局</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvGame(1)">下一局 ➡</button></div>'+'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(-1)">◀ 上一步</button><button class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvStep(1)">下一步 ▶</button><button class="btn btn-green" style="flex:1;padding:8px 6px;font-size:13px" onclick="closeReview()">关闭</button><button id="rvSbBtn" class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvSandboxToggle()">🖐 试走</button><button id="rvHintBtn" class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px" onclick="rvHint()">💡 提示</button><button id="rvSbBack" class="btn btn-outline" style="flex:1;padding:8px 6px;font-size:13px;display:none" onclick="rvSandboxBack()">↩ 返回主线</button></div>';
 document.body.appendChild(pnl);try{pnl.style.width=Math.min(((window.innerWidth||400)>=760?620:430),(window.innerWidth||400)-16)+'px';}catch(eW){}try{document.body.classList.add('rv-open');updateBoardSize();drawBoardBg();render();var _rw=$id('rvBoardWrap');if(_rw){var _mb2=$id('board');var _mw=_mb2?_mb2.getBoundingClientRect().width:0;if(!(_mw>0))_mw=Math.min((window.innerHeight||800)*0.45,(window.innerWidth||400)-32,560);_mw=Math.min(_mw,(window.innerWidth||400)-16,(window.innerHeight||800)*0.72);_mw=Math.max(_mw,240);if((window.innerWidth||0)>=760){_mw=Math.min((window.innerWidth||800)-40,(window.innerHeight||800)*0.72,600);}
-var _avail=_rw.clientWidth;if(_avail>=240&&_mw>_avail)_mw=_avail;_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._rvEngine=buildEngineToPly(0,snap.moves);window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
+var _avail=_rw.clientWidth;if(_avail>=240&&_mw>_avail)_mw=_avail;_rw.style.width=_mw+'px';_rw.style.height=(_mw*10/9)+'px';}try{var _pp=null;var _pos=JSON.parse(sessionStorage.getItem('xq_rvpos')||'null');var _pw=pnl.offsetWidth||280;if(_pos&&_pos.x!=null){pnl.style.left=Math.max(4,Math.min(_pos.x,window.innerWidth-_pw-4))+'px';pnl.style.top=Math.max(4,Math.min(_pos.y,window.innerHeight-80))+'px';}else{pnl.style.left=Math.max(4,(window.innerWidth-_pw)/2)+'px';pnl.style.top='8vh';}pnl.style.right='auto';pnl.style.margin='0';pnl.style.transform='none';}catch(e1){}window._rvEngine=buildEngineToPly(0,snap.moves,snap.startBoard,snap.startTurn);window._xqRenderRvBoard();}catch(e){}runAnalysis(snap);
 };
 function runAnalysis(snap){
 var total=snap.moves.length;
@@ -6712,7 +6801,7 @@ if(!$id('rvCurve'))return;
 if(i>=total){finish();return;}
 var st=$id('rvStatus');if(st)st.textContent='分析中 '+(i+1)+'/'+total+'…（浅层快速分析）';
 var m=snap.moves[i];
-var rev=buildEngineToPly(i,snap.moves);
+var rev=buildEngineToPly(i,snap.moves,snap.startBoard,snap.startTurn);
 var turn=rev.currentTurn;
 var fen=pfEngine.boardToFen(rev.board,turn);
 pfEngine.analyzeFen(fen,420).then(function(r){
@@ -6733,12 +6822,12 @@ if(plies.length){if(window._rvSb&&window._rvSb.on&&window._rvSb.base){var dd0=$i
 else{var d=$id('rvDetail');if(d)d.textContent='无有效评估数据';}
 }
 }
-function buildEngineToPly(n,moves){
-var rev=new CE();rev.initBoard();
+function buildEngineToPly(n,moves,startBoard,startTurn){
+var rev=new CE();if(startBoard){rev.board=[];for(var _sr=0;_sr<10;_sr++){rev.board[_sr]=[];for(var _sc=0;_sc<9;_sc++){var _sp=startBoard[_sr][_sc];rev.board[_sr][_sc]=_sp?{type:_sp.type,color:_sp.color}:null;}}rev.currentTurn=startTurn||"red";}else{rev.initBoard();}
 for(var i=0;i<n&&i<moves.length;i++){var m=moves[i];try{rev.move(m.fromRow,m.fromCol,m.toRow,m.toCol);}catch(e){}}
 return rev;
 }
-function _buildEngineCap(n,moves){var rev=new CE();rev.initBoard();var cap=null;for(var i2=0;i2<n&&i2<moves.length;i2++){var m2=moves[i2];try{var rs=rev.move(m2.fromRow,m2.fromCol,m2.toRow,m2.toCol);if(rs&&rs.captured&&i2===n-1)cap=rs.captured;}catch(e2){}}return {eng:rev,cap:cap};}
+function _buildEngineCap(n,moves,startBoard,startTurn){var rev=new CE();if(startBoard){rev.board=[];for(var _cr=0;_cr<10;_cr++){rev.board[_cr]=[];for(var _cc=0;_cc<9;_cc++){var _cp=startBoard[_cr][_cc];rev.board[_cr][_cc]=_cp?{type:_cp.type,color:_cp.color}:null;}}rev.currentTurn=startTurn||"red";}else{rev.initBoard();}var cap=null;for(var i2=0;i2<n&&i2<moves.length;i2++){var m2=moves[i2];try{var rs=rev.move(m2.fromRow,m2.fromCol,m2.toRow,m2.toCol);if(rs&&rs.captured&&i2===n-1)cap=rs.captured;}catch(e2){}}return {eng:rev,cap:cap};}
 function scoreToRedWin(sc,turn){
 if(!sc)return null;
 if(sc.type==='mate'){return turn==='red'?(sc.value>0?100:0):(sc.value>0?0:100);}
@@ -6890,11 +6979,11 @@ var plies=window._rvPlies,snap=window._rvSnap;if(!plies||!snap)return;
 if(i<0)i=0;if(i>plies.length-1)i=plies.length-1;
 window._rvIdx=i;
 try{var _rv=sessionStorage.getItem('xq_review');if(_rv){var _r2=JSON.parse(_rv);_r2.idx=i;sessionStorage.setItem('xq_review',JSON.stringify(_r2));}}catch(e){}
-window._rvEngine=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves);
+window._rvEngine=buildEngineToPly(Math.min(i+1,snap.moves.length),snap.moves,snap.startBoard,snap.startTurn);
  window._rvEngine.gameOver=true;
  if(!window._rvSavedEngine)window._rvSavedEngine=engine;
  var m=snap.moves[i];
- window._rvLastMove={row:m.toRow,col:m.toCol};try{var _bc=_buildEngineCap(Math.min(i+1,snap.moves.length),snap.moves);window._rvCaptured=(_bc&&_bc.cap)?{row:m.toRow,col:m.toCol,type:_bc.cap.type,color:_bc.cap.color}:null;}catch(eC){window._rvCaptured=null;}
+ window._rvLastMove={row:m.toRow,col:m.toCol};try{var _bc=_buildEngineCap(Math.min(i+1,snap.moves.length),snap.moves,snap.startBoard,snap.startTurn);window._rvCaptured=(_bc&&_bc.cap)?{row:m.toRow,col:m.toCol,type:_bc.cap.type,color:_bc.cap.color}:null;}catch(eC){window._rvCaptured=null;}
  window._xqRenderRvBoard();
 if(typeof D==='function'&&D('turnText'))D('turnText').textContent='📋 复盘 · 第'+(i+1)+'手';
 var p=plies[i];var d=$id('rvDetail');if(!d)return;
@@ -7008,5 +7097,11 @@ if(document.readyState==='complete'||document.readyState==='interactive')setTime
 })();
 </script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"0a4ff2af697e451c85fdf620787d507c","r":1}' crossorigin="anonymous"></script>
+<div id="egPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:3000;align-items:center;justify-content:center" onclick="if(event.target===this)closeEndgamePanel()">
+  <div style="background:#2a1810;border-radius:14px;padding:18px;max-width:430px;width:92%;max-height:82vh;overflow:auto;border:1px solid #5a3a28">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;color:#f0d9b5">🎯 残局挑战</h3><button style="width:auto;padding:4px 12px" onclick="closeEndgamePanel()">✕</button></div>
+    <div id="egList" style="margin-top:12px;color:#d9c0a0">加载中…</div>
+  </div>
+</div>
 </body>
 </html>

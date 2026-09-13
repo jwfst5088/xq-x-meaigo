@@ -116,6 +116,36 @@ async function ensureAuthSchema(db) {
   }
 }
 __name(ensureAuthSchema, "ensureAuthSchema");
+let _egSchemaReady = false;
+async function ensureEndgameSchema(db) {
+  if (!db || _egSchemaReady) return;
+  try {
+    await db.exec("CREATE TABLE IF NOT EXISTS endgame_puzzles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, difficulty INTEGER DEFAULT 1, side TEXT DEFAULT 'red', pieces TEXT NOT NULL, goal TEXT DEFAULT '', enabled INTEGER DEFAULT 1, created_at INTEGER)");
+    await db.exec("CREATE TABLE IF NOT EXISTS endgame_records (id INTEGER PRIMARY KEY AUTOINCREMENT, puzzle_id INTEGER, uid TEXT, moves INTEGER, win INTEGER, created_at INTEGER)");
+    _egSchemaReady = true;
+  } catch (e) {
+  }
+}
+__name(ensureEndgameSchema, "ensureEndgameSchema");
+function validatePieces(arr) {
+  if (!Array.isArray(arr) || arr.length < 4 || arr.length > 32) return null;
+  const okT = { rook: 1, horse: 1, elephant: 1, advisor: 1, king: 1, cannon: 1, pawn: 1 };
+  const out = [];
+  let rk = 0, bk = 0;
+  const seen = new Set();
+  for (const p of arr) {
+    if (!p || !okT[p.type] || (p.color !== "red" && p.color !== "black")) return null;
+    const row = parseInt(p.row), col = parseInt(p.col);
+    if (!(row >= 0 && row <= 9 && col >= 0 && col <= 8)) return null;
+    const key = row + "," + col;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    if (p.type === "king") { if (p.color === "red") rk++; else bk++; }
+    out.push({ type: p.type, color: p.color, row: row, col: col });
+  }
+  if (rk !== 1 || bk !== 1) return null;
+  return out;
+}
 function randomSalt() {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
@@ -125,6 +155,8 @@ __name(randomSalt, "randomSalt");
 async function applyEloResult(db, roomId, red, black, result, reason, moveCount) {
   if (!db || !red || !black || !red.dev || !black.dev || red.dev === black.dev) return null;
   if (!["red", "black", "draw"].includes(result)) return null;
+  // 游客不记录: 任一方为非注册账号(设备身份)则整局不入战绩/排行
+  if (!/^U:/.test(String(red.dev)) || !/^U:/.test(String(black.dev))) return null;
   try {
     const now = Date.now();
     const insP = "INSERT INTO players (device_id, name, elo, games, wins, losses, draws, created_at, last_seen) VALUES (?, ?, -160, 0, 0, 0, 0, ?, ?)";
@@ -1389,10 +1421,36 @@ async function handleApiRequest(request, env) {
     const p = await env.CHESS_DB.prepare("SELECT * FROM players WHERE device_id = ?").bind(String(devId).slice(0, 64)).first();
     return json({ ok: true, player: p ? { deviceId: p.device_id, name: p.name, elo: p.elo, games: p.games, wins: p.wins, losses: p.losses, draws: p.draws, title: rankTitle(p.elo) } : null });
   }
+  if (path === "/api/endgame/list") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureEndgameSchema(env.CHESS_DB);
+    try {
+      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal FROM endgame_puzzles WHERE enabled = 1 ORDER BY difficulty ASC, id ASC LIMIT 100").all();
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal }; }).filter(function (x) { return x.pieces && x.pieces.length > 3; });
+      return json({ ok: true, list: list }, 200);
+    } catch (e) {
+      return json({ error: "list failed" }, 500);
+    }
+  }
+  if (path === "/api/endgame/clear" && request.method === "POST") {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureEndgameSchema(env.CHESS_DB);
+    try {
+      const b = await request.json();
+      const pid = parseInt(b && b.id);
+      const uid = b && b.deviceId ? String(b.deviceId).slice(0, 64) : null;
+      const mv = Math.max(0, Math.min(500, parseInt(b && b.moves) || 0));
+      if (!pid || !uid) return json({ ok: false, error: "参数错误" }, 400);
+      await env.CHESS_DB.prepare("INSERT INTO endgame_records (puzzle_id, uid, moves, win, created_at) VALUES (?1, ?2, ?3, 1, ?4)").bind(pid, uid, mv, Date.now()).run();
+      return json({ ok: true }, 200);
+    } catch (e) {
+      return json({ error: "clear failed" }, 500);
+    }
+  }
   if (path === "/api/leaderboard") {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureRatingTables(env.CHESS_DB);
-    const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws FROM players WHERE games > 0 ORDER BY elo DESC LIMIT 50").all();
+    const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws FROM players WHERE games > 0 AND device_id LIKE 'U:%' ORDER BY elo DESC LIMIT 50").all();
     return json({ ok: true, list: (rows.results || []).map((r, i) => ({ rank: i + 1, name: r.name || "\u6e38\u5ba2", games: r.games, wins: r.wins, losses: r.losses, draws: r.draws })) });
   }
   if (path === "/api/match/join" && request.method === "POST" && env.MATCH_QUEUE) {
@@ -1499,7 +1557,7 @@ async function handleApiRequest(request, env) {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureRatingTables(env.CHESS_DB);
     try {
-      const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws, created_at, last_seen FROM players ORDER BY last_seen DESC LIMIT 1000").all();
+      const rows = await env.CHESS_DB.prepare("SELECT device_id, name, elo, games, wins, losses, draws, created_at, last_seen FROM players WHERE device_id LIKE 'U:%' ORDER BY last_seen DESC LIMIT 1000").all();
       return json({ ok: true, list: (rows.results || []).map((r) => ({ deviceId: r.device_id, name: r.name, elo: r.elo, games: r.games, wins: r.wins, losses: r.losses, draws: r.draws, title: rankTitle(r.elo), created_at: r.created_at, last_seen: r.last_seen })) });
     } catch (e) {
       return json({ ok: false, error: "查询失败" }, 500);
@@ -1666,10 +1724,72 @@ async function handleApiRequest(request, env) {
       return new Response(JSON.stringify({ error: "generate failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
     }
   }
+  if (path === "/api/admin/endgame/list" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureEndgameSchema(env.CHESS_DB);
+    try {
+      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, enabled, created_at FROM endgame_puzzles ORDER BY id ASC LIMIT 500").all();
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, enabled: r.enabled, created_at: r.created_at, count: (pc || []).length }; });
+      return json({ ok: true, list: list }, 200);
+    } catch (e) {
+      return json({ error: "list failed" }, 500);
+    }
+  }
+  if (path === "/api/admin/endgame/save" && request.method === "POST" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    await ensureEndgameSchema(env.CHESS_DB);
+    try {
+      const b = await request.json();
+      const name = b && b.name ? String(b.name).trim().slice(0, 30) : "";
+      const difficulty = Math.max(1, Math.min(5, parseInt(b && b.difficulty) || 1));
+      const side = b && b.side === 'black' ? 'black' : 'red';
+      const goal = b && b.goal ? String(b.goal).trim().slice(0, 120) : "";
+      const pieces = validatePieces(b && b.pieces);
+      if (!name || !pieces) return json({ ok: false, error: "名称或棋子布局不合法（双方各需一将）" }, 400);
+      const pj = JSON.stringify(pieces);
+      if (b && b.id) {
+        await env.CHESS_DB.prepare("UPDATE endgame_puzzles SET name=?1, difficulty=?2, side=?3, pieces=?4, goal=?5, enabled=?6 WHERE id=?7").bind(name, difficulty, side, pj, goal, b.enabled === 0 ? 0 : 1, parseInt(b.id)).run();
+        return json({ ok: true, id: parseInt(b.id) }, 200);
+      }
+      const mxRow = await env.CHESS_DB.prepare("SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM endgame_puzzles").first();
+      const nid = (mxRow && mxRow.nid) || 1;
+      const ins = await env.CHESS_DB.prepare("INSERT INTO endgame_puzzles (id, name, difficulty, side, pieces, goal, enabled, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)").bind(nid, name, difficulty, side, pj, goal, Date.now()).run();
+      return json({ ok: true, id: nid }, 200);
+    } catch (e) {
+      return json({ error: "save failed" }, 500);
+    }
+  }
+  if (path === "/api/admin/endgame/op" && request.method === "POST" && isAdmin) {
+    if (!env.CHESS_DB) return json({ error: "no db" }, 500);
+    try {
+      const b = await request.json();
+      const id = parseInt(b && b.id);
+      if (!id) return json({ ok: false, error: "参数错误" }, 400);
+      if (b && b.op === "delete") { await env.CHESS_DB.prepare("DELETE FROM endgame_puzzles WHERE id = ?1").bind(id).run(); return json({ ok: true }, 200); }
+      if (b && b.op === "toggle") { await env.CHESS_DB.prepare("UPDATE endgame_puzzles SET enabled = CASE enabled WHEN 1 THEN 0 ELSE 1 END WHERE id = ?1").bind(id).run(); return json({ ok: true }, 200); }
+      return json({ ok: false, error: "未知操作" }, 400);
+    } catch (e) {
+      return json({ error: "op failed" }, 500);
+    }
+  }
+  if (path === "/api/admin/vip/batch_delete" && request.method === "POST" && isAdmin) {
+    try {
+      const b = await request.json();
+      const type = b && b.type === "members" ? "members" : "codes";
+      const ids = Array.isArray(b && b.ids) ? b.ids.map(function (x) { return String(x).slice(0, 64); }).filter(Boolean).slice(0, 200) : [];
+      if (!ids.length) return new Response(JSON.stringify({ ok: false, error: "未选择任何项" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+      const stmts = ids.map(function (k) { return type === "members" ? env.CHESS_DB.prepare("DELETE FROM vip_members WHERE id = ?1").bind(k) : env.CHESS_DB.prepare("DELETE FROM vip_codes WHERE code = ?1").bind(k); });
+      const rs = await env.CHESS_DB.batch(stmts);
+      const deleted = rs.reduce(function (acc, r) { return acc + (r && r.meta && r.meta.changes ? r.meta.changes : 0); }, 0);
+      return new Response(JSON.stringify({ ok: true, deleted }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "batch delete failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }
+  }
   if (path === "/api/admin/vip/codes" && isAdmin) {
     try {
       const rs = await env.CHESS_DB.prepare("SELECT code, tier, days, used_by, used_at, created_at FROM vip_codes ORDER BY created_at DESC LIMIT 200").all();
-      return new Response(JSON.stringify({ ok: true, codes: rs.rows || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, codes: rs.results || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (e) {
       return new Response(JSON.stringify({ error: "list failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
     }
@@ -1677,7 +1797,7 @@ async function handleApiRequest(request, env) {
   if (path === "/api/admin/vip/members" && isAdmin) {
     try {
       const rs = await env.CHESS_DB.prepare("SELECT id, tier, expires_at, created_at, source FROM vip_members ORDER BY expires_at DESC LIMIT 200").all();
-      return new Response(JSON.stringify({ ok: true, members: rs.rows || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, members: rs.results || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (e) {
       return new Response(JSON.stringify({ error: "list failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
     }
@@ -1874,8 +1994,27 @@ async function handleWebSocket(ws, env) {
         } else {
           requestedRoomId = payload;
         }
-        const roomId = requestedRoomId || (await generateFreeRoomId(env.CHESS_DB));
-        ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
+        let _vipOk = false;
+        try {
+          const cands = [];
+          if (payload && typeof payload.vipId === "string" && payload.vipId) cands.push(String(payload.vipId).slice(0, 64));
+          const _did = (payload && typeof payload.deviceId === "string" && payload.deviceId) ? String(payload.deviceId).slice(0, 64) : (ws._deviceId || null);
+          if (_did) cands.push(_did);
+          const uniq = [];
+          for (var ci = 0; ci < cands.length; ci++) if (uniq.indexOf(cands[ci]) < 0) uniq.push(cands[ci]);
+          let _vipRow = null;
+          if (uniq.length) {
+            const _q = "SELECT id FROM vip_members WHERE id IN (" + uniq.map(function(_, i2) { return "?"; }).join(",") + ") AND expires_at > ?";
+            _vipRow = await (ws._env || env).CHESS_DB.prepare(_q).bind.apply(null, uniq.concat([Date.now()])).first();
+          }
+          _vipOk = !!_vipRow;
+        } catch (eVip2) { _vipOk = true; console.error("[gate] ERR", eVip2 && eVip2.message); }
+        if (_vipOk) {
+          const roomId = requestedRoomId || (await generateFreeRoomId(env.CHESS_DB));
+          ws.send(JSON.stringify({ event: "redirect_room", data: { roomId, action: "create", lastColor } }));
+        } else {
+          try { ws.send(JSON.stringify({ event: "vip_only_create", data: { msg: "只有会员才能创建房间，可使用快速匹配" } })); } catch (eVip3) {}
+        }
       } else if (eventName === "ping") {
         ws._lastSeen = Date.now();
         try {
