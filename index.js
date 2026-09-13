@@ -1427,8 +1427,10 @@ async function handleApiRequest(request, env) {
     await ensureEndgameSchema(env.CHESS_DB);
     try {
       const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, solution FROM endgame_puzzles WHERE enabled = 1 ORDER BY difficulty ASC, id ASC LIMIT 100").all();
-      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = []; try { sol = JSON.parse(r.solution || "[]"); } catch (eS3) {}
-        if (!Array.isArray(sol)) sol = [];
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = r.solution;
+        if (sol == null || sol === "") sol = [];
+        else if (typeof sol === "string") { try { const _p = JSON.parse(sol); if (Array.isArray(_p)) sol = _p; } catch (eS) {} }
+        else if (!Array.isArray(sol)) sol = [];
         return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, solution: sol }; }).filter(function (x) { return x.pieces && x.pieces.length > 3; });
       return json({ ok: true, list: list }, 200);
     } catch (e) {
@@ -1732,8 +1734,10 @@ async function handleApiRequest(request, env) {
     await ensureEndgameSchema(env.CHESS_DB);
     try {
       const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, enabled, created_at, solution FROM endgame_puzzles ORDER BY id ASC LIMIT 500").all();
-      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = []; try { sol = JSON.parse(r.solution || "[]"); } catch (eS2) {}
-      if (!Array.isArray(sol)) sol = [];
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = r.solution;
+        if (sol == null || sol === "") sol = [];
+        else if (typeof sol === "string") { try { const _p = JSON.parse(sol); if (Array.isArray(_p)) sol = _p; } catch (eS) {} }
+        else if (!Array.isArray(sol)) sol = [];
       return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, enabled: r.enabled, created_at: r.created_at, count: (pc || []).length, solution: sol }; });
       return json({ ok: true, list: list }, 200);
     } catch (e) {
@@ -1753,6 +1757,12 @@ async function handleApiRequest(request, env) {
       if (!name || !pieces) return json({ ok: false, error: "名称或棋子布局不合法（双方各需一将）" }, 400);
       const pj = JSON.stringify(pieces);
       let solJson = "[]";
+      if (b && typeof b.solutionText === "string" && b.solutionText.trim()) {
+        solJson = String(b.solutionText).slice(0, 4000);
+      }
+      if (b && typeof b.solutionText === "string" && b.solutionText.trim()) {
+        solJson = String(b.solutionText).slice(0, 4000);
+      }
       if (b && Array.isArray(b.solution)) {
         const sol = [];
         for (const sm of b.solution) { if (sm && typeof sm === "object") { const fr = parseInt(sm.fromRow), fc = parseInt(sm.fromCol), tr = parseInt(sm.toRow), tc = parseInt(sm.toCol); if ([fr, fc, tr, tc].every(function (v) { return v >= 0 && v <= 9; })) sol.push({ fromRow: fr, fromCol: fc, toRow: tr, toCol: tc }); } }
