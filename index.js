@@ -122,6 +122,7 @@ async function ensureEndgameSchema(db) {
   try {
     await db.exec("CREATE TABLE IF NOT EXISTS endgame_puzzles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, difficulty INTEGER DEFAULT 1, side TEXT DEFAULT 'red', pieces TEXT NOT NULL, goal TEXT DEFAULT '', enabled INTEGER DEFAULT 1, created_at INTEGER)");
     await db.exec("CREATE TABLE IF NOT EXISTS endgame_records (id INTEGER PRIMARY KEY AUTOINCREMENT, puzzle_id INTEGER, uid TEXT, moves INTEGER, win INTEGER, created_at INTEGER)");
+    try { await db.exec("ALTER TABLE endgame_puzzles ADD COLUMN solution TEXT DEFAULT '[]'"); } catch (eS1) {}
     _egSchemaReady = true;
   } catch (e) {
   }
@@ -1425,8 +1426,10 @@ async function handleApiRequest(request, env) {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureEndgameSchema(env.CHESS_DB);
     try {
-      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal FROM endgame_puzzles WHERE enabled = 1 ORDER BY difficulty ASC, id ASC LIMIT 100").all();
-      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal }; }).filter(function (x) { return x.pieces && x.pieces.length > 3; });
+      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, solution FROM endgame_puzzles WHERE enabled = 1 ORDER BY difficulty ASC, id ASC LIMIT 100").all();
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = []; try { sol = JSON.parse(r.solution || "[]"); } catch (eS3) {}
+        if (!Array.isArray(sol)) sol = [];
+        return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, solution: sol }; }).filter(function (x) { return x.pieces && x.pieces.length > 3; });
       return json({ ok: true, list: list }, 200);
     } catch (e) {
       return json({ error: "list failed" }, 500);
@@ -1728,8 +1731,10 @@ async function handleApiRequest(request, env) {
     if (!env.CHESS_DB) return json({ error: "no db" }, 500);
     await ensureEndgameSchema(env.CHESS_DB);
     try {
-      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, enabled, created_at FROM endgame_puzzles ORDER BY id ASC LIMIT 500").all();
-      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, enabled: r.enabled, created_at: r.created_at, count: (pc || []).length }; });
+      const rows = await env.CHESS_DB.prepare("SELECT id, name, difficulty, side, pieces, goal, enabled, created_at, solution FROM endgame_puzzles ORDER BY id ASC LIMIT 500").all();
+      const list = (rows.results || []).map(function (r) { let pc = []; try { pc = JSON.parse(r.pieces); } catch (e0) {} let sol = []; try { sol = JSON.parse(r.solution || "[]"); } catch (eS2) {}
+      if (!Array.isArray(sol)) sol = [];
+      return { id: r.id, name: r.name, difficulty: r.difficulty, side: r.side, pieces: pc, goal: r.goal, enabled: r.enabled, created_at: r.created_at, count: (pc || []).length, solution: sol }; });
       return json({ ok: true, list: list }, 200);
     } catch (e) {
       return json({ error: "list failed" }, 500);
@@ -1747,13 +1752,19 @@ async function handleApiRequest(request, env) {
       const pieces = validatePieces(b && b.pieces);
       if (!name || !pieces) return json({ ok: false, error: "名称或棋子布局不合法（双方各需一将）" }, 400);
       const pj = JSON.stringify(pieces);
+      let solJson = "[]";
+      if (b && Array.isArray(b.solution)) {
+        const sol = [];
+        for (const sm of b.solution) { if (sm && typeof sm === "object") { const fr = parseInt(sm.fromRow), fc = parseInt(sm.fromCol), tr = parseInt(sm.toRow), tc = parseInt(sm.toCol); if ([fr, fc, tr, tc].every(function (v) { return v >= 0 && v <= 9; })) sol.push({ fromRow: fr, fromCol: fc, toRow: tr, toCol: tc }); } }
+        solJson = JSON.stringify(sol.slice(0, 30));
+      }
       if (b && b.id) {
-        await env.CHESS_DB.prepare("UPDATE endgame_puzzles SET name=?1, difficulty=?2, side=?3, pieces=?4, goal=?5, enabled=?6 WHERE id=?7").bind(name, difficulty, side, pj, goal, b.enabled === 0 ? 0 : 1, parseInt(b.id)).run();
+        await env.CHESS_DB.prepare("UPDATE endgame_puzzles SET name=?1, difficulty=?2, side=?3, pieces=?4, goal=?5, enabled=?6, solution=?7 WHERE id=?8").bind(name, difficulty, side, pj, goal, b.enabled === 0 ? 0 : 1, solJson, parseInt(b.id)).run();
         return json({ ok: true, id: parseInt(b.id) }, 200);
       }
       const mxRow = await env.CHESS_DB.prepare("SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM endgame_puzzles").first();
       const nid = (mxRow && mxRow.nid) || 1;
-      const ins = await env.CHESS_DB.prepare("INSERT INTO endgame_puzzles (id, name, difficulty, side, pieces, goal, enabled, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)").bind(nid, name, difficulty, side, pj, goal, Date.now()).run();
+      const ins = await env.CHESS_DB.prepare("INSERT INTO endgame_puzzles (id, name, difficulty, side, pieces, goal, enabled, created_at, solution) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8)").bind(nid, name, difficulty, side, pj, goal, Date.now(), solJson).run();
       return json({ ok: true, id: nid }, 200);
     } catch (e) {
       return json({ error: "save failed" }, 500);

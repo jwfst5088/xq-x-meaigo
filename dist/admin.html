@@ -87,7 +87,8 @@ td{padding:6px 8px;border-bottom:1px solid #2c1810}
       <div style="margin-bottom:6px"><input id="egName" placeholder="残局名称（如：马炮争雄）" style="width:100%;padding:7px;background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px" maxlength="30"></div>
       <div style="margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">难度 <select id="egDiff" style="background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;padding:5px"><option value="1">★</option><option value="2">★★</option><option value="3">★★★</option><option value="4">★★★★</option><option value="5">★★★★★</option></select> 玩家执 <select id="egSide" style="background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;padding:5px"><option value="red">红方</option><option value="black">黑方</option></select></div>
       <div style="margin-bottom:6px"><input id="egGoal" placeholder="目标说明（如：三步内将死黑方）" style="width:100%;padding:7px;background:#241611;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px" maxlength="60"></div>
-      <div style="margin-bottom:6px" class="mut">摆局：先点下方棋子按钮选中，再点棋盘格放置；点击已有棋子的格子可清除。</div>
+      <div style="margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>参考走法:</b><span id="egAnsInfo" class="mut">未录入</span><button onclick="egAnsToggle()" id="egAnsBtn" style="padding:5px 12px">录制参考走法</button><button onclick="egAnsClear()" style="padding:5px 12px">清空</button></div>
+      <div style="margin-bottom:6px" class="mut">摆局：先点下方棋子按钮选中，再点棋盘格放置；点击已有棋子的格子可清除。录制参考走法时直接在棋盘上依次点击 起点→终点 记录每一步。</div>
       <div id="egPick" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px"></div>
       <div id="egBoard" style="position:relative;width:296px;height:330px;margin-bottom:6px;box-shadow:0 3px 14px rgba(0,0,0,.55);border-radius:4px;overflow:hidden"><canvas id="egBg" width="296" height="330" style="position:absolute;left:0;top:0"></canvas><div id="egPieces" style="position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none"></div></div>
       <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="egSave()" style="background:#3f6f3f">💾 保存残局</button> <button onclick="egResetForm()">清空重摆</button> <span id="egCount" class="mut" style="align-self:center"></span></div>
@@ -312,18 +313,61 @@ function egBuildBoard() {
   var bd = document.getElementById("egBoard");
   var o = "";
   for (var r2 = 0; r2 < 10; r2++) for (var c2 = 0; c2 < 9; c2++) {
-    o += '<div onclick="egCell(' + r2 + ',' + c2 + ')" style="position:absolute;left:' + (EG_PS + c2 * EG_RCS - 17) + 'px;top:' + (EG_PS + r2 * EG_RCS - 17) + 'px;width:34px;height:34px;cursor:pointer;z-index:3"></div>';
+    o += '<div data-r="' + r2 + '" data-c="' + c2 + '" onclick="egCell(' + r2 + ',' + c2 + ')" style="position:absolute;left:' + (EG_PS + c2 * EG_RCS - 17) + 'px;top:' + (EG_PS + r2 * EG_RCS - 17) + 'px;width:34px;height:34px;cursor:pointer;z-index:3"></div>';
   }
   var old = document.getElementById("egHits");
   if (old) old.remove();
   var hits = document.createElement("div");
   hits.id = "egHits"; hits.style.cssText = "position:absolute;inset:0;z-index:3";
   hits.innerHTML = o;
+  if (egAnsMode) {
+    for (var ai = 0; ai < egAnswer.length; ai++) {
+      egAnsMark(egAnswer[ai].fromRow, egAnswer[ai].fromCol);
+      egAnsMark(egAnswer[ai].toRow, egAnswer[ai].toCol);
+    }
+    if (egAnsFrom) egAnsMark(egAnsFrom.row, egAnsFrom.col);
+  }
   bd.appendChild(hits);
   document.getElementById("egCount").textContent = "共 " + egPieces.length + " 子（双方各需一将）";
 }
 function egFind(r, c) { for (var i = 0; i < egPieces.length; i++) { var p = egPieces[i]; if (p.row === r && p.col === c) return p; } return null; }
+var egAnswer = [];
+var egAnsMode = false;
+var egAnsFrom = null;
+function egAnsInfo() {
+  var n = document.getElementById("egAnsInfo");
+  if (n) n.textContent = egAnswer.length ? ("已录 " + egAnswer.length + " 步") : "未录入";
+}
+function egAnsToggle() {
+  egAnsMode = !egAnsMode;
+  egAnsFrom = null;
+  document.getElementById("egAnsBtn").textContent = egAnsMode ? "完成录制" : "录制参考走法";
+  egMsg(egAnsMode ? "录制中：在棋盘上依次点击 起点→终点 记录每一步" : "已退出录制");
+  egBuildBoard();
+}
+function egAnsClear() {
+  egAnswer = [];
+  egAnsFrom = null;
+  egAnsInfo();
+  egBuildBoard();
+  egMsg("参考走法已清空");
+}
 function egCell(r, c) {
+  if (egAnsMode) {
+    if (!egAnsFrom) {
+      egAnsFrom = { row: r, col: c };
+      egBuildBoard();
+      egMsg("起点 (" + r + "," + c + ")，再点终点");
+      return;
+    }
+    if (egAnsFrom.row === r && egAnsFrom.col === c) { egAnsFrom = null; egBuildBoard(); egMsg("已取消起点"); return; }
+    egAnswer.push({ fromRow: egAnsFrom.row, fromCol: egAnsFrom.col, toRow: r, toCol: c });
+    egAnsFrom = null;
+    egAnsInfo();
+    egBuildBoard();
+    egMsg("已录第 " + egAnswer.length + " 步，继续或点完成录制");
+    return;
+  }
   var ex = egFind(r, c);
   if (ex) { egPieces.splice(egPieces.indexOf(ex), 1); egBuildBoard(); return; }
   if (!egPick) { egMsg("请先在上方选择要放置的棋子"); return; }
@@ -332,7 +376,9 @@ function egCell(r, c) {
   egBuildBoard();
 }
 function egResetForm() {
-  egPieces = []; egPick = null;
+  egPieces = []; egPick = null; egAnswer = []; egAnsMode = false; egAnsFrom = null;
+  var ab = document.getElementById("egAnsBtn"); if (ab) ab.textContent = "录制参考走法";
+  egAnsInfo();
   document.getElementById("egName").value = "";
   document.getElementById("egGoal").value = "";
   document.getElementById("egDiff").value = "1";
@@ -346,7 +392,7 @@ function egSave() {
   if (!name) { egMsg("请输入残局名称"); return; }
   var ks = egPieces.filter(function (p) { return p.type === "king"; });
   if (ks.filter(function (p) { return p.color === 'red'; }).length !== 1 || ks.filter(function (p) { return p.color === 'black'; }).length !== 1) { egMsg('双方必须各有一将/帅'); return; }
-  var body = { token: TOKEN, id: document.getElementById("egFormTitle").dataset.id || null, name: name, difficulty: Number(document.getElementById("egDiff").value) || 1, side: document.getElementById("egSide").value, goal: document.getElementById("egGoal").value.trim(), pieces: egPieces, enabled: 1 };
+  var body = { token: TOKEN, id: document.getElementById("egFormTitle").dataset.id || null, name: name, difficulty: Number(document.getElementById("egDiff").value) || 1, side: document.getElementById("egSide").value, goal: document.getElementById("egGoal").value.trim(), pieces: egPieces, solution: egAnswer, enabled: 1 };
   api('/api/admin/endgame/save', body).then(function (r) {
     if (r && r.ok) { egMsg('✔ 已保存（ID ' + r.id + '）'); egList(); egResetForm(); }
     else egMsg('✘ ' + ((r && r.error) || '保存失败'));
@@ -377,6 +423,10 @@ function egEdit(id) {
     var p = (r.list || []).filter(function (x) { return x.id === id; })[0];
     if (!p) { egMsg("未找到该残局"); return; }
     egPieces = JSON.parse(JSON.stringify(p.pieces || []));
+    egAnswer = Array.isArray(p.solution) ? JSON.parse(JSON.stringify(p.solution)) : [];
+    egAnsMode = false; egAnsFrom = null;
+    var ab2 = document.getElementById("egAnsBtn"); if (ab2) ab2.textContent = "录制参考走法";
+    egAnsInfo();
     document.getElementById("egName").value = p.name;
     document.getElementById("egGoal").value = p.goal || "";
     document.getElementById("egDiff").value = String(p.difficulty || 1);

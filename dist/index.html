@@ -1211,7 +1211,7 @@ checkStreak=0;lastCheckColor=null;
 enterGameUI();
 saveGameState();
 // AI执红时先走棋
-if(aiCl==='red'&&!engine.gameOver){startAiThink();}
+egAnsShowBar(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 }
 
 function retryAiGame(){
@@ -1232,7 +1232,7 @@ D('turnText').textContent='红方走棋';
 drawBoardBg();render();startTimer();sndStart();
 saveGameState();
 // AI执红时先走棋
-if(aiCl==='red'&&!engine.gameOver){startAiThink();}
+egAnsShowBar(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 }
 
 window._endgameActive=null;window._endgamePz=null;
@@ -1258,7 +1258,7 @@ D('turnText').textContent='红方走棋';
 drawBoardBg();render();
 startTimer();sndStart();
 try{toast('残局挑战「'+pz.name+'」，将死对方即通关！',3200);}catch(e0){}
-if(aiCl==='red'&&!engine.gameOver){pikafishDeepThink();}
+egAnsShowBar(true);if(aiCl==='red'&&!engine.gameOver){pikafishDeepThink();}
 }
 function retryEndgame(){
 hideOverlay();stopAi();
@@ -1286,6 +1286,62 @@ window._egCache=r.list;}
 box.innerHTML=out;
 }).catch(function(){box.innerHTML="加载失败，请稍后再试";});
 }catch(e){box.innerHTML="加载失败";}
+}
+window._egAns={steps:[],idx:0};
+function egAnsEnsureBar(){
+  var wrap=document.querySelector(".board-wrap");
+  if(!wrap)return;
+  var bar=document.getElementById("egAnsBar");
+  if(!bar){
+    bar=document.createElement("div");
+    bar.id="egAnsBar";
+    bar.style.cssText="display:none;justify-content:center;align-items:center;gap:14px;margin:8px auto 0;max-width:420px";
+    bar.innerHTML='<button id="egAnsPrev" style="padding:6px 18px;background:#2a1a10;color:#f0d9b5;border:1px solid #5a3a28;border-radius:8px;font-size:14px;cursor:pointer">\u2b05 上一步</button><span id="egAnsCnt" style="color:#d4a843;font-size:14px;font-weight:800"></span><button id="egAnsNext" style="padding:6px 18px;background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer">下一步 \u27a1</button>';
+    wrap.parentNode.insertBefore(bar,wrap.nextSibling);
+    document.getElementById("egAnsPrev").onclick=function(){egAnsStep(-1);};
+    document.getElementById("egAnsNext").onclick=function(){egAnsStep(1);};
+  }
+}
+function egAnsClearMark(){
+  var bd=document.getElementById("board");
+  if(!bd)return;
+  bd.querySelectorAll(".egAnsHl").forEach(function(e){e.remove();});
+}
+function egAnsShow(){
+  egAnsClearMark();
+  var a=window._egAns;
+  var cnt=document.getElementById("egAnsCnt");
+  if(cnt)cnt.textContent=a.steps.length?("参考 "+a.idx+" / "+a.steps.length+" 步"):"本局无参考走法";
+  if(!a.steps.length||a.idx<=0)return;
+  var m=a.steps[a.idx-1];
+  var bd=document.getElementById("board");
+  if(!bd)return;
+  [[m.fromRow,m.fromCol,"#3fa34d"],[m.toRow,m.toCol,"#e05252"]].forEach(function(it){
+    var pp=pos(it[0],it[1]);
+    var d=document.createElement("div");
+    d.className="egAnsHl";
+    d.style.cssText="position:absolute;left:"+pp.x+"px;top:"+pp.y+"px;width:"+(cs*0.92)+"px;height:"+(cs*0.92)+"px;transform:translate(-50%,-50%);border:3px solid "+it[2]+";border-radius:50%;box-sizing:border-box;pointer-events:none;z-index:4";
+    bd.appendChild(d);
+  });
+}
+function egAnsStep(dir){
+  var a=window._egAns;
+  if(!a.steps.length){toast("本局未录入参考走法",1600);return;}
+  var ni=a.idx+dir;
+  if(ni<0){toast("已是第一步之前",1400);return;}
+  if(ni>a.steps.length){toast("已是最后一步",1400);return;}
+  a.idx=ni;
+  egAnsShow();
+}
+function egAnsShowBar(on){
+  egAnsEnsureBar();
+  var bar=document.getElementById("egAnsBar");
+  if(bar)bar.style.display=on?"flex":"none";
+  if(on){
+    var pz=window._endgamePz;
+    window._egAns={steps:(pz&&Array.isArray(pz.solution))?pz.solution.slice(0,30):[],idx:0};
+    egAnsShow();
+  }else{egAnsClearMark();}
 }
 function startEndgameFromList(id){
 var p=(window._egCache||[]).filter(function(x){return x.id===id;})[0];
