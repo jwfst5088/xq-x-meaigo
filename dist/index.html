@@ -1320,7 +1320,7 @@ function egAnsParseText(){
     var hi=HAN.indexOf(ch); if(hi>=0)return hi+1;
     return -1;
   }
-  function colOf(side,n){return (side==="red")?(9-n):(n-1);}
+  function colOf(sd,n){return (sd==="red")?(9-n):(n-1);}
   toks.forEach(function(tk){
     var s=tk;
     while(s.length>1&&/[0-9]/.test(s[0])){if(s[1]==="."){s=s.slice(2);}else{s=s.slice(1);}}
@@ -1387,10 +1387,22 @@ function egAnsParseText(){
   });
   return rows;
 }
-function egAnsClearMark(){
-  var bd=document.getElementById("board");
-  if(!bd)return;
-  bd.querySelectorAll(".egAnsHl").forEach(function(e){e.remove();});
+function egAnsResetBoard(){
+  var sb=window._endgameStartBoard;
+  if(!sb)return false;
+  for(var r=0;r<10;r++)for(var c=0;c<9;c++){var p=sb[r][c];engine.board[r][c]=p?{type:p.type,color:p.color}:null;}
+  engine.currentTurn=window._endgameStartTurn||"red";
+  engine.gameOver=false;engine.winner=null;engine.moveHistory=[];engine.lastMove=null;
+  return true;
+}
+function egAnsReplay(k){
+  if(!egAnsResetBoard())return false;
+  for(var i=0;i<k&&i<window._egAns.rows.length;i++){
+    var m=window._egAns.rows[i];
+    if(m.fail)return false;
+    try{engine.move(m.fr,m.fc,m.tr,m.tc);}catch(eR){return false;}
+  }
+  return true;
 }
 function egAnsEnsurePanel(){
   var rp=document.querySelector(".side-panel.right-panel");
@@ -1400,7 +1412,7 @@ function egAnsEnsurePanel(){
     pn=document.createElement("div");
     pn.id="egAnsPanel";
     pn.style.cssText="display:none;background:#1c120a;border:1px solid #5a3a28;border-radius:8px;padding:8px;margin-bottom:8px";
-    pn.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="color:#d4a843;font-size:13px">\ud83d\udcd6 参考走法</b><span id="egAnsCnt" style="color:#9c8468;font-size:12px"></span><span style="flex:1"></span><button id="egAnsPrev" style="padding:4px 12px;background:#2a1a10;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;font-size:12px;cursor:pointer">\u2b05 上一步</button><button id="egAnsNext" style="padding:4px 12px;background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer">下一步 \u27a1</button></div><div id="egAnsList" style="max-height:200px;overflow:auto;font-size:12px;line-height:1.9;color:#e8d5b5"></div>';
+    pn.innerHTML='<style>@media(max-width:768px){#egAnsPanel{padding:5px !important;margin-bottom:4px !important}#egAnsList{display:none !important}#egAnsPanel>div{margin-bottom:0 !important;flex-wrap:nowrap !important}#egAnsPanel button{padding:4px 10px !important;font-size:11px !important}}@media(min-width:769px){#egAnsPanel{padding:8px}}#egAnsPanel>div{margin-bottom:6px}</style><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="color:#d4a843;font-size:13px">\ud83d\udcd6 \u53c2\u8003\u8d70\u6cd5</b><span id="egAnsCnt" style="color:#9c8468;font-size:12px"></span><span style="flex:1"></span><button id="egAnsPrev" style="padding:4px 12px;background:#2a1a10;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;font-size:12px;cursor:pointer">\u2b05 \u4e0a\u4e00\u6b65</button><button id="egAnsNext" style="padding:4px 12px;background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer">\u4e0b\u4e00\u6b65 \u27a1</button></div><div id="egAnsList" style="max-height:200px;overflow:auto;font-size:12px;line-height:1.9;color:#e8d5b5"></div>';
     rp.insertBefore(pn,rp.firstChild);
     document.getElementById("egAnsPrev").onclick=function(){egAnsStep(-1);};
     document.getElementById("egAnsNext").onclick=function(){egAnsStep(1);};
@@ -1410,13 +1422,16 @@ function egAnsRenderList(){
   var a=window._egAns;
   var ls=document.getElementById("egAnsList");
   if(!ls)return;
+  ls.style.display=(window.innerWidth<=768)?"none":"";
+  var pnM=document.getElementById("egAnsPanel");
+  if(pnM)pnM.style.padding=(window.innerWidth<=768)?"5px":"8px";
   ls.innerHTML="";
   a.rows.forEach(function(r,i){
     var d=document.createElement("div");
     d.className="egAnsRow"+(i===a.idx-1?" cur":"");
     var st=(i===a.idx-1)?"background:#3a2414;border-left:3px solid #d4a843;padding-left:5px;color:#f0d9b5":"padding-left:8px;color:#9c8468";
     d.style.cssText=st;
-    d.textContent=(i+1)+". "+(r.side==="red"?"\u7ea2":"\u9ed1")+" "+r.txt+(r.fail?" \uff1f":"");
+    d.textContent=(i+1)+". "+(r.side==="red"?"\u7ea2":"\u9ed1")+" "+r.txt+(r.fail?" ?":"");
     ls.appendChild(d);
   });
   var cur=ls.querySelector(".egAnsRow.cur");
@@ -1424,40 +1439,43 @@ function egAnsRenderList(){
   var cnt=document.getElementById("egAnsCnt");
   if(cnt)cnt.textContent=a.rows.length?((a.idx)+" / "+a.rows.length):"\u672c\u5c40\u65e0\u53c2\u8003\u8d70\u6cd5";
 }
-function egAnsShow(){
-  egAnsClearMark();
-  egAnsRenderList();
-  var a=window._egAns;
-  if(!a.rows.length||a.idx<=0)return;
-  var m=a.rows[a.idx-1];
-  if(m.fail)return;
-  var bd=document.getElementById("board");
-  if(!bd)return;
-  [[m.fr,m.fc,"#3fa34d"],[m.tr,m.tc,"#e05252"]].forEach(function(it){
-    var pp=pos(it[0],it[1]);
-    var d=document.createElement("div");
-    d.className="egAnsHl";
-    d.style.cssText="position:absolute;left:"+pp.x+"px;top:"+pp.y+"px;width:"+(cs*0.92)+"px;height:"+(cs*0.92)+"px;transform:translate(-50%,-50%);border:3px solid "+it[2]+";border-radius:50%;box-sizing:border-box;pointer-events:none;z-index:4";
-    bd.appendChild(d);
-  });
-}
 function egAnsStep(dir){
   var a=window._egAns;
-  if(!a.rows.length){toast("本局未录入参考走法",1600);return;}
-  var ni=a.idx+dir;
-  if(ni<0){toast("已是第一步之前",1400);return;}
-  if(ni>a.rows.length){toast("已是最后一步",1400);return;}
-  a.idx=ni;
-  egAnsShow();
+  if(!a.rows.length){toast("\u672c\u5c40\u672a\u5f55\u5165\u53c2\u8003\u8d70\u6cd5",1600);return;}
+  if(aiThinking){toast("AI\u601d\u8003\u4e2d\uff0c\u8bf7\u7a0d\u5019",1400);return;}
+  if(dir===1){
+    if(a.idx>=a.rows.length){toast("\u5df2\u662f\u6700\u540e\u4e00\u6b65",1400);return;}
+    var m=a.rows[a.idx];
+    if(m.fail){toast("\u8be5\u7740\u65e0\u6cd5\u5728\u5f53\u524d\u5c40\u9762\u6f14\u793a",1600);return;}
+    if(m.side!==engine.currentTurn){toast("\u5f53\u524d\u8f6e\u5230"+(engine.currentTurn==="red"?"\u7ea2":"\u9ed1")+"\u65b9\uff0c\u4e0e\u53c2\u8003\u8d70\u6cd5\u4e0d\u7b26",2000);return;}
+    var rs=null;
+    try{rs=engine.move(m.fr,m.fc,m.tr,m.tc);}catch(eM){rs=null;}
+    if(!rs){toast("\u5f53\u524d\u5c40\u9762\u4e0e\u53c2\u8003\u8d70\u6cd5\u4e0d\u7b26\uff0c\u53ef\u5148\u70b9\u91cd\u5f00",2000);return;}
+    a.idx++;
+    render();
+    if(rs.check)toast("\u5c06\u519b!",1200);
+    if(engine.gameOver){egAnsRenderList();showGameOver(engine.winner);return;}
+  } else {
+    if(a.idx<=0){toast("\u5df2\u662f\u7b2c\u4e00\u6b65\u4e4b\u524d",1400);return;}
+    a.idx--;
+    if(!egAnsReplay(a.idx)){toast("\u56de\u9000\u5931\u8d25",1400);return;}
+    render();
+  }
+  egAnsRenderList();
 }
 function egAnsShowBar(on){
-  egAnsEnsurePanel();
   var pn=document.getElementById("egAnsPanel");
-  if(pn)pn.style.display=on?"block":"none";
   if(on){
+    egAnsEnsurePanel();
+    pn=document.getElementById("egAnsPanel");
+    if(!pn)return;
     window._egAns={rows:egAnsParseText(),idx:0};
-    egAnsShow();
-  }else{egAnsClearMark();}
+    pn.style.display="block";
+    pn.style.padding=(window.innerWidth<=768)?"5px":"8px";
+    egAnsRenderList();
+  } else {
+    if(pn)pn.remove();
+  }
 }
 function startEndgameFromList(id){
 var p=(window._egCache||[]).filter(function(x){return x.id===id;})[0];
@@ -1800,6 +1818,7 @@ enterOnlineGame(d.roomId,d.color);
 D('turnText').textContent='等待对手加入...';
 });
 socket.on('redirect_room',function(d){
+try{egAnsShowBar(false);}catch(eEgA){}
 window._pendingRoomAction=d;
 socket.reconnectToRoom(d.roomId);
 });
@@ -1807,7 +1826,7 @@ socket.on('vip_only_create',function(d){
 window.showVipGateDialog((d&&d.msg)||'只有会员才能创建房间，可使用快速匹配。');
 });
 socket.on('room_joined',function(d){
-try{egAnsShowBar(false);}catch(eEgA){}
+try{egAnsShowBar(false);}catch(eEgB){}
 try{localStorage.removeItem('xq_game');}catch(e){}
 myRm=d.roomId;myCl=d.color;gm='online';D('lobbyStatus').textContent='';
 try{localStorage.setItem('xq_last_color',d.color);}catch(e){} // 记录本盘颜色，下一盘轮换先手
@@ -6360,7 +6379,7 @@ function startPikafishGame(userColor){
 	checkStreak = 0; lastCheckColor = null;
 	enterGameUI();
 	saveGameState();
-	if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
+	egAnsShowBar(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
 }
 
 async function pikafishDeepThink(){
@@ -6430,7 +6449,7 @@ function retryPikafishGame(){
 	D('turnText').textContent = '红方走棋';
 	drawBoardBg(); render(); startTimer(); sndStart();
 	saveGameState();
-	if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
+	egAnsShowBar(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
 }
 
 function discSocket(){if(socket){try{socket.disconnect();}catch(e){}socket=null;}}
@@ -6528,7 +6547,7 @@ D('turnText').textContent=engine.currentTurn==='red'?'红方走棋':'黑方走�
 updateBoardSize();drawBoardBg();render();requestAnimationFrame(function(){updateBoardSize();drawBoardBg();render();});setTimeout(function(){updateBoardSize();drawBoardBg();render();},400);
 if(!engine.gameOver){startTimer();updateTimers();}
 if(engine.currentTurn===aiCl&&!engine.gameOver){
-if(g.gm==='pikafish')pikafishDeepThink();else startAiThink();
+try{egAnsShowBar(false);}catch(eEgC){}if(g.gm==='pikafish')pikafishDeepThink();else startAiThink();
 }
 }else if(g.gm==='online'&&g.myRm){
 window._pendingReconnect=g;
