@@ -1412,7 +1412,7 @@ function egAnsEnsurePanel(){
     pn=document.createElement("div");
     pn.id="egAnsPanel";
     pn.style.cssText="display:none;background:#1c120a;border:1px solid #5a3a28;border-radius:8px;padding:8px;margin-bottom:8px";
-    pn.innerHTML='<style>@media(max-width:768px){#egAnsPanel{padding:5px !important;margin-bottom:4px !important}#egAnsList{display:none !important}#egAnsPanel>div{margin-bottom:0 !important;flex-wrap:nowrap !important}#egAnsPanel button{padding:4px 10px !important;font-size:11px !important}}@media(min-width:769px){#egAnsPanel{padding:8px}}#egAnsPanel>div{margin-bottom:6px}</style><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="color:#d4a843;font-size:13px">\ud83d\udcd6 \u53c2\u8003\u8d70\u6cd5</b><span id="egAnsCnt" style="color:#9c8468;font-size:12px"></span><span style="flex:1"></span><button id="egAnsPrev" style="padding:4px 12px;background:#2a1a10;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;font-size:12px;cursor:pointer">\u2b05 \u4e0a\u4e00\u6b65</button><button id="egAnsNext" style="padding:4px 12px;background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer">\u4e0b\u4e00\u6b65 \u27a1</button></div><div id="egAnsList" style="max-height:200px;overflow:auto;font-size:12px;line-height:1.9;color:#e8d5b5"></div>';
+    pn.innerHTML='<style>@media(max-width:768px){#egAnsPanel{padding:5px !important;margin-bottom:4px !important}#egAnsList{display:none !important}#egAnsPanel>div{margin-bottom:0 !important;flex-wrap:nowrap !important}#egAnsPanel button{padding:4px 10px !important;font-size:11px !important}}@media(min-width:769px){#egAnsPanel{padding:8px}}#egAnsPanel>div{margin-bottom:6px}</style><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b id="egAnsHead" style="color:#d4a843;font-size:13px;white-space:nowrap">\ud83d\udcd6 \u53c2\u8003\u8d70\u6cd5</b><span id="egAnsCur" style="display:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8d5b5;font-size:12px"></span><span id="egAnsCnt" style="color:#9c8468;font-size:12px"></span><span id="egAnsSp" style="flex:1"></span><button id="egAnsPrev" style="padding:4px 12px;background:#2a1a10;color:#f0d9b5;border:1px solid #5a3a28;border-radius:6px;font-size:12px;cursor:pointer">\u2b05 \u4e0a\u4e00\u6b65</button><button id="egAnsNext" style="padding:4px 12px;background:linear-gradient(135deg,#d4a843,#a8782a);color:#1a0f08;border:none;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer">\u4e0b\u4e00\u6b65 \u27a1</button></div><div id="egAnsList" style="max-height:200px;overflow:auto;font-size:12px;line-height:1.9;color:#e8d5b5"></div>';
     rp.insertBefore(pn,rp.firstChild);
     document.getElementById("egAnsPrev").onclick=function(){egAnsStep(-1);};
     document.getElementById("egAnsNext").onclick=function(){egAnsStep(1);};
@@ -1438,6 +1438,23 @@ function egAnsRenderList(){
   if(cur&&cur.scrollIntoView)cur.scrollIntoView({block:"nearest"});
   var cnt=document.getElementById("egAnsCnt");
   if(cnt)cnt.textContent=a.rows.length?((a.idx)+" / "+a.rows.length):"\u672c\u5c40\u65e0\u53c2\u8003\u8d70\u6cd5";
+  var mob=window.innerWidth<=768;
+  var curEl=document.getElementById("egAnsCur");
+  var spEl=document.getElementById("egAnsSp");
+  var pvB=document.getElementById("egAnsPrev");
+  var nxB=document.getElementById("egAnsNext");
+  var hdB=document.getElementById("egAnsHead");
+  if(curEl){
+    if(mob){
+      curEl.style.display="block";
+      curEl.textContent=a.idx>0?((a.idx)+". "+(a.rows[a.idx-1].side==="red"?"\u7ea2":"\u9ed1")+" "+a.rows[a.idx-1].txt):"\u70b9\u27a1\u770b\u53c2\u8003\u8d70\u6cd5";
+    }else{curEl.style.display="none";}
+  }
+  if(spEl)spEl.style.display=mob?"none":"";
+  if(cnt)cnt.style.display=mob?"none":"";
+  if(pvB){pvB.textContent=mob?"\u2b05":"\u2b05 \u4e0a\u4e00\u6b65";pvB.style.padding=mob?"6px 14px":"4px 12px";pvB.style.fontSize=mob?"13px":"12px";pvB.style.minWidth=mob?"52px":"0";}
+  if(nxB){nxB.textContent=mob?"\u27a1":"\u4e0b\u4e00\u6b65 \u27a1";nxB.style.padding=mob?"6px 14px":"4px 12px";nxB.style.fontSize=mob?"13px":"12px";nxB.style.minWidth=mob?"52px":"0";}
+  if(hdB)hdB.style.fontSize=mob?"12px":"13px";
 }
 function egAnsStep(dir){
   var a=window._egAns;
