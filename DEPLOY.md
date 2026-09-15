@@ -1,6 +1,6 @@
 # 象棋弈台 部署文档（Cloudflare Worker cf-chess2 · 新式 Assets）
 
-> 原版主仓库（会员版克隆见 xq-cloudflare-member）。
+> 本仓库为会员版（xq-cloudflare-member），克隆自 xq-x-meaigo；部署方式与原仓库完全相同。
 
 ## 站点信息
 - 线上地址: https://xq.chaf.eu.org
