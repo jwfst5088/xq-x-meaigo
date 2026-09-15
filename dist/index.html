@@ -1734,7 +1734,7 @@ try{if(document.getElementById('rvPanel')&&typeof closeReview==='function')close
 soundEnabled=false;gameOverSoundPlayed=false;
 if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
 stopTimer();stopAi();gameStarted=false;selected=null;validMoves=[];capRed=[];capBlk=[];lastMove=null;engine.initBoard();
-gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent=sockOk?'● 服务器已连接':'○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
@@ -1751,7 +1751,7 @@ if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
 stopTimer();stopAi();gameStarted=false;selected=null;validMoves=[];capRed=[];capBlk=[];lastMove=null;engine.initBoard();
 if(gm==='online'&&sockOk){try{socket.emit('leave_room');}catch(e){}}
 if(socket){try{socket.disconnect();}catch(e){}socket=null;sockOk=false;}
-gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent='○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
@@ -1768,7 +1768,7 @@ if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
 stopTimer();stopAi();gameStarted=false;selected=null;validMoves=[];capRed=[];capBlk=[];lastMove=null;engine.initBoard();
 if(gm==='online'&&sockOk){try{socket.emit('leave_room');}catch(e){}}
 if(socket){try{socket.disconnect();}catch(e){}socket=null;sockOk=false;}
-gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent='○ 服务器离线（本地模式可用）';hideOverlay();hideReconnecting();
@@ -2160,7 +2160,7 @@ hideReconnecting();
 if(window._dcTimer){clearInterval(window._dcTimer);window._dcTimer=null;}
 stopTimer();stopAi();gameStarted=false;selected=null;validMoves=[];capRed=[];capBlk=[];lastMove=null;engine.initBoard();
 if(socket){try{socket.disconnect();}catch(e){}socket=null;sockOk=false;}
-gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
+window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;gm='local';myCl=null;myRm=null;boardFlip=false;window._xqSpectator=false;D('drawBtn').style.display='none';
 D('game').classList.remove('show');D('lobby').classList.remove('hide');
 D('redName').textContent='红方';D('blackName').textContent='黑方';
 D('lobbyStatus').textContent='';hideOverlay();
@@ -6421,7 +6421,7 @@ function startPikafishGame(userColor){
 	if(aiThinking) return;
 	userColor = userColor || (Math.random() < 0.5 ? 'red' : 'black');
 	soundEnabled = true; gameOverSoundPlayed = false; undoUsed = false; aiThinking = false;
-	gm = 'pikafish'; myCl = userColor; myRm = null; boardFlip = (userColor === 'black');
+	window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null; gm = 'pikafish'; myCl = userColor; myRm = null; boardFlip = (userColor === 'black');
 	aiCl = (userColor === 'red') ? 'black' : 'red';
 	D('drawBtn').style.display = 'none';
 	D('redName').textContent = (userColor === 'red') ? _xqMyName()+'（红方）' : '高级AI（红方）';
@@ -6588,7 +6588,7 @@ D('drawBtn').style.display='none';
 D('redName').textContent=(myCl==='red')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（红方）':'AI（红方）';
 D('blackName').textContent=(myCl==='black')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（黑方）':'AI（黑方）';
 engine.initBoard();
-if(g.egBoard){for(var _er=0;_er<10;_er++)for(var _ec=0;_ec<9;_ec++){var _ep=g.egBoard[_er][_ec];engine.board[_er][_ec]=_ep?{type:_ep.type,color:_ep.color}:null;}}
+if(g.egBoard&&g.gm==='ai'){for(var _er=0;_er<10;_er++)for(var _ec=0;_ec<9;_ec++){var _ep=g.egBoard[_er][_ec];engine.board[_er][_ec]=_ep?{type:_ep.type,color:_ep.color}:null;}}
 capRed=[];capBlk=[];lastMove=null;
 if(g.moveHistory){for(var i=0;i<g.moveHistory.length;i++){var m=g.moveHistory[i];var rs=engine.move(m.fromRow,m.fromCol,m.toRow,m.toCol);if(rs&&rs.captured){if(rs.captured.color==='red')capRed.push(rs.captured);else capBlk.push(rs.captured);}}}
 if(g.moveHistory&&g.moveHistory.length>0){var lm=g.moveHistory[g.moveHistory.length-1];lastMove={row:lm.toRow,col:lm.toCol};}
@@ -6597,12 +6597,12 @@ if(g.redLeft!=null){redLeft=g.redLeft;blkLeft=g.blkLeft;}
 engine.currentTurn=g.currentTurn||'red';engine.gameOver=g.gameOver||false;engine.winner=g.winner||null;
 undoUsed=g.undoUsed||false;
 gameStarted=true;selected=null;validMoves=[];
-if(g.egBoard){window._endgameStartBoard=g.egBoard;window._endgameStartTurn=g.egTurn||'red';window._endgamePz=g.egPz||{};window._endgameActive=true;D('modeBadge').textContent='残局挑战'+((g.egPz&&g.egPz.name)?('「'+g.egPz.name+'」'):'');try{egAnsShowBar(true);}catch(eEgR){window._egRestoreErr=eEgR.message;}}
+if(g.egBoard&&g.gm==='ai'){window._endgameStartBoard=g.egBoard;window._endgameStartTurn=g.egTurn||'red';window._endgamePz=g.egPz||{};window._endgameActive=true;D('modeBadge').textContent='残局挑战'+((g.egPz&&g.egPz.name)?('「'+g.egPz.name+'」'):'');try{egAnsShowBar(true);}catch(eEgR){window._egRestoreErr=eEgR.message;}}
 D('turnText').textContent=engine.currentTurn==='red'?'红方走棋':'黑方走棋';
 updateBoardSize();drawBoardBg();render();requestAnimationFrame(function(){updateBoardSize();drawBoardBg();render();});setTimeout(function(){updateBoardSize();drawBoardBg();render();},400);
 if(!engine.gameOver){startTimer();updateTimers();}
 if(engine.currentTurn===aiCl&&!engine.gameOver){
-if(g.egBoard){try{egAnsShowBar(true);}catch(eEgC){}}else{try{egAnsShowBar(false);}catch(eEgC){}}if(g.gm==='pikafish'||window._endgameActive)pikafishDeepThink();else startAiThink();
+if(window._endgameActive){try{egAnsShowBar(true);}catch(eEgC){}}else{try{egAnsShowBar(false);}catch(eEgC){}}if(g.gm==='pikafish'||window._endgameActive)pikafishDeepThink();else startAiThink();
 }
 }if(g.gm==='ai'||g.gm==='pikafish')xqSetChatVisible(false);else if(g.gm==='online'&&g.myRm){
 try{window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;}catch(eEgD){}xqSetChatVisible(true);
