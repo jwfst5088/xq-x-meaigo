@@ -1211,7 +1211,7 @@ checkStreak=0;lastCheckColor=null;
 enterGameUI();
 saveGameState();
 // AI执红时先走棋
-egAnsShowBar(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
+egAnsShowBar(false);xqSetChatVisible(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 }
 
 function retryAiGame(){
@@ -1232,7 +1232,7 @@ D('turnText').textContent='红方走棋';
 drawBoardBg();render();startTimer();sndStart();
 saveGameState();
 // AI执红时先走棋
-egAnsShowBar(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
+egAnsShowBar(false);xqSetChatVisible(false);if(aiCl==='red'&&!engine.gameOver){startAiThink();}
 }
 
 window._endgameActive=null;window._endgamePz=null;
@@ -1258,7 +1258,7 @@ D('turnText').textContent='红方走棋';
 drawBoardBg();render();
 startTimer();sndStart();
 try{toast('残局挑战「'+pz.name+'」，将死对方即通关！',3200);}catch(e0){}
-egAnsShowBar(true);if(aiCl==='red'&&!engine.gameOver){pikafishDeepThink();}
+egAnsShowBar(true);xqSetChatVisible(false);if(aiCl==='red'&&!engine.gameOver){pikafishDeepThink();}
 }
 function retryEndgame(){
 hideOverlay();stopAi();
@@ -1452,8 +1452,8 @@ function egAnsRenderList(){
   }
   if(spEl)spEl.style.display=mob?"none":"";
   if(cnt)cnt.style.display=mob?"none":"";
-  if(pvB){pvB.textContent=mob?"\u2b05":"\u2b05 \u4e0a\u4e00\u6b65";pvB.style.padding=mob?"6px 14px":"4px 12px";pvB.style.fontSize=mob?"13px":"12px";pvB.style.minWidth=mob?"52px":"0";}
-  if(nxB){nxB.textContent=mob?"\u27a1":"\u4e0b\u4e00\u6b65 \u27a1";nxB.style.padding=mob?"6px 14px":"4px 12px";nxB.style.fontSize=mob?"13px":"12px";nxB.style.minWidth=mob?"52px":"0";}
+  if(pvB){pvB.textContent=mob?"\u2b05":"\u2b05 \u4e0a\u4e00\u6b65";pvB.style.padding=mob?"4px 14px":"4px 12px";pvB.style.fontSize=mob?"13px":"12px";pvB.style.minWidth=mob?"52px":"0";}
+  if(nxB){nxB.textContent=mob?"\u27a1":"\u4e0b\u4e00\u6b65 \u27a1";nxB.style.padding=mob?"4px 14px":"4px 12px";nxB.style.fontSize=mob?"13px":"12px";nxB.style.minWidth=mob?"52px":"0";}
   if(hdB)hdB.style.fontSize=mob?"12px":"13px";
 }
 function egAnsStep(dir){
@@ -1470,6 +1470,7 @@ function egAnsStep(dir){
     if(!rs){toast("\u5f53\u524d\u5c40\u9762\u4e0e\u53c2\u8003\u8d70\u6cd5\u4e0d\u7b26\uff0c\u53ef\u5148\u70b9\u91cd\u5f00",2000);return;}
     a.idx++;
     render();
+    saveGameState();
     if(rs.check)toast("\u5c06\u519b!",1200);
     if(engine.gameOver){egAnsRenderList();showGameOver(engine.winner);return;}
   } else {
@@ -1480,6 +1481,11 @@ function egAnsStep(dir){
   }
   egAnsRenderList();
 }
+function xqSetChatVisible(v){
+  var ca=document.querySelector('.chat-area');var cd=document.getElementById('chatDisplay');
+  if(ca)ca.style.display=v?'':'none';
+  if(cd)cd.style.display=v?'':'none';
+}
 function egAnsShowBar(on){
   var pn=document.getElementById("egAnsPanel");
   if(on){
@@ -1488,10 +1494,39 @@ function egAnsShowBar(on){
     if(!pn)return;
     window._egAns={rows:egAnsParseText(),idx:0};
     pn.style.display="block";
-    pn.style.padding=(window.innerWidth<=768)?"5px":"8px";
+    var _ca=document.querySelector(".chat-area");
+    var _cd=document.getElementById("chatDisplay");
+    if(window.innerWidth<=768){
+      pn.style.padding="3px 5px";
+      pn.style.position="";
+      pn.style.left="";
+      pn.style.right="";
+      pn.style.bottom="";
+      pn.style.top="";
+      pn.style.zIndex="";
+      pn.style.marginBottom="0";
+      pn.style.boxShadow="";
+      if(_cd)_cd.style.display="none";
+      if(_ca)_ca.style.padding="4px 8px";
+      window._egAnsHidCd=true;
+    }else{
+      pn.style.padding="8px";
+      pn.style.position="";
+      pn.style.left="";
+      pn.style.right="";
+      pn.style.bottom="";
+      pn.style.top="";
+      pn.style.zIndex="";
+      pn.style.marginBottom="8px";
+      pn.style.boxShadow="";
+      if(_cd)_cd.style.display="";
+      if(_ca)_ca.style.padding="";
+      window._egAnsHidCd=false;
+    }
     egAnsRenderList();
   } else {
     if(pn)pn.remove();
+    if(window._egAnsHidCd){var _cd2=document.getElementById("chatDisplay");if(_cd2)_cd2.style.display="";var _ca2=document.querySelector(".chat-area");if(_ca2)_ca2.style.padding="";window._egAnsHidCd=false;}
   }
 }
 function startEndgameFromList(id){
@@ -1835,7 +1870,7 @@ enterOnlineGame(d.roomId,d.color);
 D('turnText').textContent='等待对手加入...';
 });
 socket.on('redirect_room',function(d){
-try{egAnsShowBar(false);}catch(eEgA){}
+try{egAnsShowBar(false);}catch(eEgA){}try{window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;}catch(eEgD){}xqSetChatVisible(true);
 window._pendingRoomAction=d;
 socket.reconnectToRoom(d.roomId);
 });
@@ -1843,7 +1878,7 @@ socket.on('vip_only_create',function(d){
 window.showVipGateDialog((d&&d.msg)||'只有会员才能创建房间，可使用快速匹配。');
 });
 socket.on('room_joined',function(d){
-try{egAnsShowBar(false);}catch(eEgB){}
+try{egAnsShowBar(false);}catch(eEgB){}try{window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;}catch(eEgD){}xqSetChatVisible(true);
 try{localStorage.removeItem('xq_game');}catch(e){}
 myRm=d.roomId;myCl=d.color;gm='online';D('lobbyStatus').textContent='';
 try{localStorage.setItem('xq_last_color',d.color);}catch(e){} // 记录本盘颜色，下一盘轮换先手
@@ -2068,6 +2103,7 @@ if(window._rvSavedEngine)return;
 if(gm==='ai'||gm==='pikafish'){
 try{
 var st={gm:gm,myCl:myCl,aiCl:aiCl,currentTurn:engine.currentTurn,gameOver:engine.gameOver,winner:engine.winner,moveHistory:engine.moveHistory.slice(),capRed:capRed.slice(),capBlk:capBlk.slice(),redLeft:redLeft,blkLeft:blkLeft,lastMove:lastMove,undoUsed:undoUsed};
+if(window._endgameActive){st.egBoard=window._endgameStartBoard;st.egTurn=window._endgameStartTurn;st.egPz=window._endgamePz||{};}
 localStorage.setItem('xq_game',JSON.stringify(st));
 sessionStorage.setItem('xq_game','1');
 }catch(e){}
@@ -6396,7 +6432,7 @@ function startPikafishGame(userColor){
 	checkStreak = 0; lastCheckColor = null;
 	enterGameUI();
 	saveGameState();
-	egAnsShowBar(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
+	egAnsShowBar(false);xqSetChatVisible(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
 }
 
 async function pikafishDeepThink(){
@@ -6466,7 +6502,7 @@ function retryPikafishGame(){
 	D('turnText').textContent = '红方走棋';
 	drawBoardBg(); render(); startTimer(); sndStart();
 	saveGameState();
-	egAnsShowBar(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
+	egAnsShowBar(false);xqSetChatVisible(false);if(aiCl === 'red' && !engine.gameOver){ pikafishDeepThink(); }
 }
 
 function discSocket(){if(socket){try{socket.disconnect();}catch(e){}socket=null;}}
@@ -6552,6 +6588,7 @@ D('drawBtn').style.display='none';
 D('redName').textContent=(myCl==='red')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（红方）':'AI（红方）';
 D('blackName').textContent=(myCl==='black')?(typeof _xqMyName==='function'?_xqMyName():'我')+'（黑方）':'AI（黑方）';
 engine.initBoard();
+if(g.egBoard){for(var _er=0;_er<10;_er++)for(var _ec=0;_ec<9;_ec++){var _ep=g.egBoard[_er][_ec];engine.board[_er][_ec]=_ep?{type:_ep.type,color:_ep.color}:null;}}
 capRed=[];capBlk=[];lastMove=null;
 if(g.moveHistory){for(var i=0;i<g.moveHistory.length;i++){var m=g.moveHistory[i];var rs=engine.move(m.fromRow,m.fromCol,m.toRow,m.toCol);if(rs&&rs.captured){if(rs.captured.color==='red')capRed.push(rs.captured);else capBlk.push(rs.captured);}}}
 if(g.moveHistory&&g.moveHistory.length>0){var lm=g.moveHistory[g.moveHistory.length-1];lastMove={row:lm.toRow,col:lm.toCol};}
@@ -6560,13 +6597,15 @@ if(g.redLeft!=null){redLeft=g.redLeft;blkLeft=g.blkLeft;}
 engine.currentTurn=g.currentTurn||'red';engine.gameOver=g.gameOver||false;engine.winner=g.winner||null;
 undoUsed=g.undoUsed||false;
 gameStarted=true;selected=null;validMoves=[];
+if(g.egBoard){window._endgameStartBoard=g.egBoard;window._endgameStartTurn=g.egTurn||'red';window._endgamePz=g.egPz||{};window._endgameActive=true;D('modeBadge').textContent='残局挑战'+((g.egPz&&g.egPz.name)?('「'+g.egPz.name+'」'):'');try{egAnsShowBar(true);}catch(eEgR){window._egRestoreErr=eEgR.message;}}
 D('turnText').textContent=engine.currentTurn==='red'?'红方走棋':'黑方走棋';
 updateBoardSize();drawBoardBg();render();requestAnimationFrame(function(){updateBoardSize();drawBoardBg();render();});setTimeout(function(){updateBoardSize();drawBoardBg();render();},400);
 if(!engine.gameOver){startTimer();updateTimers();}
 if(engine.currentTurn===aiCl&&!engine.gameOver){
-try{egAnsShowBar(false);}catch(eEgC){}if(g.gm==='pikafish')pikafishDeepThink();else startAiThink();
+if(g.egBoard){try{egAnsShowBar(true);}catch(eEgC){}}else{try{egAnsShowBar(false);}catch(eEgC){}}if(g.gm==='pikafish'||window._endgameActive)pikafishDeepThink();else startAiThink();
 }
-}else if(g.gm==='online'&&g.myRm){
+}if(g.gm==='ai'||g.gm==='pikafish')xqSetChatVisible(false);else if(g.gm==='online'&&g.myRm){
+try{window._endgameActive=null;window._endgamePz=null;window._endgameStartBoard=null;window._endgameStartTurn=null;}catch(eEgD){}xqSetChatVisible(true);
 window._pendingReconnect=g;
 gm='online';myRm=g.myRm;myCl=g.myCl;
 boardFlip=(myCl==='black');
@@ -6980,10 +7019,10 @@ if(btns)btns.appendChild(b);else ob.appendChild(b);
 }catch(e){}
 };
 }
-window.openLiveReview=function(){try{var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];if(mv&&mv.length){var _snap={moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine&&engine.gameOver)?engine.winner:null,gm:(typeof gm!=='undefined')?gm:'online'};if(window._endgameActive&&window._endgameStartBoard){_snap.startBoard=window._endgameStartBoard;_snap.startTurn=window._endgameStartTurn||'red';}openReview(_snap);return;}var self=arguments;var proceed=function(){try{var list=window._rvMerged?window._rvMerged():[];if(!list.length){toast('还没有可复盘的对局');return;}window._rvMIdx=list.length-1;var it=list[list.length-1];if(it.srv){var meta=it.srv;var _idf=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/get?id='+meta.id+'&deviceId='+encodeURIComponent(_idf.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.game&&d.game.moves&&d.game.moves.length){openReview({moves:d.game.moves,myCl:d.game.myCl,winner:d.game.winner,gm:d.game.gm});}else{toast('棋谱加载失败');}}).catch(function(){toast('棋谱加载失败');});}else{var g=it.loc;if(g&&g.moves&&g.moves.length){openReview({moves:g.moves,myCl:g.myCl,winner:g.winner,gm:g.gm});}}}catch(eP){toast('复盘打开失败');}};if(window._histSrv&&window._histSrv.length){proceed();return;}var _idf2=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf2.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;}proceed();}).catch(function(){proceed();});}catch(e){}};
+window.openLiveReview=function(){try{var mv=(typeof engine!=='undefined'&&engine&&engine.moveHistory)?engine.moveHistory:[];if(mv&&mv.length){var _snap={moves:JSON.parse(JSON.stringify(mv)),myCl:(typeof myCl!=='undefined')?myCl:'red',winner:(typeof engine!=='undefined'&&engine&&engine.gameOver)?engine.winner:null,gm:(typeof gm!=='undefined')?gm:'online'};if((typeof gm!=='undefined'&&gm==='ai')&&window._endgameActive&&window._endgameStartBoard){_snap.startBoard=window._endgameStartBoard;_snap.startTurn=window._endgameStartTurn||'red';}openReview(_snap);return;}if((typeof gm!=='undefined'&&gm==='ai')&&window._endgameActive&&window._endgameStartBoard){try{openReview({moves:[],myCl:(typeof myCl!=='undefined')?myCl:'red',winner:null,gm:(typeof gm!=='undefined')?gm:'ai',startBoard:window._endgameStartBoard,startTurn:window._endgameStartTurn||'red'});}catch(eEG1){}return;}var self=arguments;var proceed=function(){try{var list=window._rvMerged?window._rvMerged():[];if(!list.length){toast('还没有可复盘的对局');return;}window._rvMIdx=list.length-1;var it=list[list.length-1];if(it.srv){var meta=it.srv;var _idf=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/get?id='+meta.id+'&deviceId='+encodeURIComponent(_idf.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.game&&d.game.moves&&d.game.moves.length){openReview({moves:d.game.moves,myCl:d.game.myCl,winner:d.game.winner,gm:d.game.gm});}else{toast('棋谱加载失败');}}).catch(function(){toast('棋谱加载失败');});}else{var g=it.loc;if(g&&g.moves&&g.moves.length){openReview({moves:g.moves,myCl:g.myCl,winner:g.winner,gm:g.gm});}}}catch(eP){toast('复盘打开失败');}};if(window._histSrv&&window._histSrv.length){proceed();return;}var _idf2=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf2.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;}proceed();}).catch(function(){proceed();});}catch(e){}};
 window.openReview=function(snapIn){
 var snap=snapIn||window._reviewSnapshot;
-if(!snap||!snap.moves||!snap.moves.length){toast('没有可复盘的对局');return;}
+if(!snap||!snap.moves||(!snap.moves.length&&!snap.startBoard)){toast('没有可复盘的对局');return;}
 window._rvSnap=snap;window._rvPlies=null;window._rvIdx=-1;try{var _h0=JSON.parse(localStorage.getItem('xq_history')||'[]');window._rvGameIdx=_h0.length?_h0.length-1:null;window._rvMIdx=null;}catch(e0){window._rvGameIdx=null;}try{var _idf0=(window._xqIdentityFields&&window._xqIdentityFields())||{};fetch('/api/history/list?deviceId='+encodeURIComponent(_idf0.deviceId||'')).then(function(r){return r.json()}).then(function(d){if(d&&d.ok&&d.games){window._histSrv=d.games;window._rvGameIdxSrv=null;}}).catch(function(){});}catch(e5){}
 try{sessionStorage.setItem('xq_review',JSON.stringify({snap:snap,plies:null,idx:0}));}catch(e){}window._rvSavedEngine=null;
 hideOverlay();
